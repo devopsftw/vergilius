@@ -1,0 +1,6 @@
+{
+  "service": {
+    "name": "vergilius https/http2 gateway",
+    "port": 443
+  }
+}
