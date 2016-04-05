@@ -1,5 +1,5 @@
-FROM e96tech/baseimage
-MAINTAINER Vasiliy Ostanin <bazilio@e96.ru>
+FROM phusion/passenger-full
+MAINTAINER Vasiliy Ostanin <bazilio91@gamil.ru>
 
 RUN apt-key adv --keyserver hkp://pgp.mit.edu:80 --recv-keys 573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62
 RUN echo "deb http://nginx.org/packages/mainline/ubuntu/ trusty nginx" > /etc/apt/sources.list.d/nginx.list
@@ -7,7 +7,8 @@ RUN echo "deb http://nginx.org/packages/mainline/ubuntu/ trusty nginx" > /etc/ap
 ENV NGINX_VERSION 1.9.9-1~trusty
 
 RUN apt-get update
-RUN apt-get install -y ca-certificates nginx=${NGINX_VERSION} git-core python build-essential autoconf libtool \
+RUN apt-get upgrade -y -o Dpkg::Options::="--force-confold" \
+    apt-get install -y ca-certificates nginx=${NGINX_VERSION} git-core python build-essential autoconf libtool \
     python-dev libffi-dev libssl-dev python-pip dialog
 
 RUN git clone https://github.com/letsencrypt/letsencrypt /opt/letsencrypt
@@ -29,7 +30,7 @@ RUN mkdir -p /etc/nginx/sites-enabled/certs
 COPY vergilius /opt/vergilius
 RUN pip install -U letsencrypt
 RUN pip install -e /opt/vergilius
-# Clean up APT when done.
-#RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 EXPOSE 80 443
+
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

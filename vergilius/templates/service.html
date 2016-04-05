@@ -1,16 +1,16 @@
 {% whitespace all%}
-upstream {{service.name}} {
+upstream {{service.id}} {
     least_conn;
     {% for node_name in service.nodes %}server {{ service.nodes[node_name]['address'] }}:{{ service.nodes[node_name]['port'] }};{% end %}
-    server 127.0.0.1:6666 backup;
+    {% if not service.nodes %}server 127.0.0.1:6666;{% end %}
 }
 
 {% if len(service.domains['http2']) %}
 server {
     server_name{% for domain in service.domains['http2'] %} {{ domain }} *.{{ domain }}{% end %};
-    listen ssl http2;
+    listen {{config.NGINX_HTTP2_PORT}} ssl http2;
 
-    ssl_certificate     {{service.certificate.get_pem_path()}};
+    ssl_certificate     {{service.certificate.get_cert_path()}};
     ssl_certificate_key {{service.certificate.get_key_path()}};
 
     ssl_session_timeout 5m;
@@ -21,7 +21,7 @@ server {
     ssl_prefer_server_ciphers on;
 
     location / {
-        proxy_pass http://{{service.name}};
+        proxy_pass http://{{service.id}};
 
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
@@ -45,10 +45,11 @@ server {
 {% if len(service.domains['http']) %}
 server {
     server_name{% for domain in service.domains['http'] %} {{ domain }} *.{{ domain }}{% end %};
-    listen 80;
+    listen {{config.NGINX_HTTP_PORT}};
 
+    {% if len(service.domains['http']) %}
     location / {
-        proxy_pass http://{{service.name}};
+        proxy_pass http://{{service.id}};
 
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
@@ -68,5 +69,10 @@ server {
         }
         {% end %}
     }
+    {% else %}
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+    {% end %}
 }
 {% end %}

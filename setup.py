@@ -6,16 +6,19 @@ install_requires = [
     'letsencrypt',
     'python-consul',
     'tornado',
+    'setuptools>=1.0',
+    'zope.component',
+    'zope.interface',
 ]
 
 setup(
-        name='vergilius_letsencrypt',
-        description="Vergilius plugin for Let's Encrypt client",
-        url='https://github.com/E96/vergilius',
+        name='vergilius',
+        description="Vergilius self configuring web server",
+        url='https://github.com/devopsftw/vergilius',
         author="Vasiliy Ostanin",
-        author_email='bazilio@e96.ru',
+        author_email='bazilio91@gmail.ru',
         license='Apache License 2.0',
         install_requires=install_requires,
         packages=find_packages(),
-        scripts=['vergilius.py'],
+        scripts=['vergilius/app.py'],
 )

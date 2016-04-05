@@ -1,0 +1,19 @@
+prompt = no
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+[ req_distinguished_name ]
+C                      = AU
+ST                     = Some state
+L                      = Some city
+O                      = Some Company
+OU                     = Experimental Software Authority
+CN                     = {{ domain }}
+emailAddress           = {{ email }}
+[ v3_req ]
+# Extensions to add to a certificate request
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+[ alt_names ]
+{% for idx, dns in enumerate(dns_list) %}DNS.{{ idx }} = {{ dns }}
+{% end %}
