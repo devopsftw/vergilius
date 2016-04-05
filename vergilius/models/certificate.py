@@ -88,6 +88,11 @@ class Certificate(object):
 
     def request_certificate(self):
         logger.debug('[certificate][%s] Requesting new keys for %s ' % (self.service.name, self.domains))
+        session_id = consul.session.create(behavior='delete')
+        if not consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=session_id):
+            logger.debug('[certificate][%s] failed to acquire lock for keys generation' % self.service.name)
+            return False
+
         data = certificate_provider.gencert(self.service.id, self.domains)
 
         with open(data['private_key'], 'r') as f:
@@ -104,6 +109,8 @@ class Certificate(object):
         self.key_domains = self.serialize_domains()
         consul.kv.put('vergilius/certificates/%s/expires' % self.service.id, str(self.expires))
         consul.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
+        consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=session_id)
+        consul.session.destroy(session_id)
         logger.info('[certificate][%s]: got new keys for %s ' % (self.service.name, self.domains))
 
     def serialize_domains(self):

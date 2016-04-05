@@ -30,8 +30,8 @@ class Test(unittest.TestCase):
 
     def test_poll(self):
         consul.agent.service.register('test', 'test', tags=['http'])
-        time.sleep(0.2)
+        time.sleep(1)
         self.assertTrue(self.watcher.services['test'], 'service registered')
         consul.agent.service.deregister('test')
-        time.sleep(0.2)
+        time.sleep(1)
         self.assertFalse('test' in self.watcher.services.keys(), 'service unregistered')
