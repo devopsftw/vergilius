@@ -8,10 +8,9 @@ services:
 before_install:
 - docker pull e96tech/consul-server
 - docker pull nginx
-- docker run -d --net=host --name consul e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc docker -domain test -server
+- docker run -d -p 8500:8500 --name consul e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc docker -domain test -server
 - docker run -d --net=host -v /etc/nginx/conf.d/:/etc/nginx/conf.d/ --name nginx nginx
 - docker ps -a
-- lsof -i :53
 - docker logs consul
 - echo -e '#!/bin/sh\nexec docker exec nginx nginx $@' > "$NGINX_BINARY" && chmod +x "$NGINX_BINARY"
 - mkdir $DATA_PATH $NGINX_CONFIG_PATH
