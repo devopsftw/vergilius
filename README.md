@@ -45,10 +45,11 @@ To use `http2` proxy, use `http2` tag instead of `http` or use both. Vergilius w
 plugin or create self signed certificate. 
 
 # identity
-Vergilius has an identity. To move vergilius seamlessly, copy `vergilius/identity` consul folder to your 
+Vergilius has an identity. To move vergilius seamlessly, copy `vergilius/identity` consul kv folder to your 
 new cluster. If no identity found on start - it will be created for you.
 
-- Consul key: `vergilius/identity/private_key` — private dsa3 encrypted RSA key with password specified in env `SECRET`
+- Consul key: `vergilius/identity/private_key` — private dsa3 encrypted RSA key with password specified in env `SECRET`,
+used for certificates signing.
 - Environment variable: `SECRET` - used for any encryption in vergilius
 
 # service configuration
@@ -66,7 +67,7 @@ There are [letsencrypt/acme](https://github.com/devopsftw/vergilius-acme) and
 # TODO
 
 - readthedocs, sphinx
-- Apache Zookeeper, etcd, eureka support?
+- docker events + labels, Apache Zookeeper, etcd, eureka, etc. support?
 
 For any ideas or issues please don't hesitate to submit an issue on 
 [github](https://github.com/devopsftw/vergilius/issues).
