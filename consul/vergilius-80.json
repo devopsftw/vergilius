@@ -1,0 +1,6 @@
+{
+  "service": {
+    "name": "vergilius http gateway",
+    "port": 80
+  }
+}

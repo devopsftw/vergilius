@@ -1,0 +1,10 @@
+{
+  "service": {
+    "name": "vergilius-admin",
+    "tags": [
+      "http2",
+      "http2:${ADMIN_URL:-vergilius.dev}"
+    ],
+    "port": 8888
+  }
+}
