@@ -1,10 +1,10 @@
 import unittest
 
 from mock import mock
-
 from vergilius import consul
-from vergilius.models.certificate import Certificate
-from vergilius.models.service import Service
+
+from models import Certificate
+from models import Service
 
 
 class Test(unittest.TestCase):

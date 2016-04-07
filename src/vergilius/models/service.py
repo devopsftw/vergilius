@@ -1,21 +1,16 @@
 import os
 import re
-import unicodedata
-import tempfile
 import subprocess
+import tempfile
+import unicodedata
 
 from consul import tornado, base
-
-from tornado.locks import Event
-
-from vergilius import config, consul_tornado
-from vergilius import logger, template_loader
+from vergilius import config, consul_tornado, consul, logger, template_loader
+from vergilius.loop.nginx_reloader import NginxReloader
 from vergilius.models.certificate import Certificate
 
 
 class Service(object):
-    nginx_update_event = Event()
-
     def __init__(self, name):
         """
         :type name: unicode - service name got from consul
@@ -32,6 +27,13 @@ class Service(object):
 
         self.active = True
         self.certificate = None
+
+        self.fetch()
+        self.watch()
+
+    def fetch(self):
+        index, data = consul.catalog.service(self.name)
+        self.parse_data(data)
 
     @tornado.gen.coroutine
     def watch(self):
@@ -67,9 +69,6 @@ class Service(object):
 
         self.allow_crossdomain = allow_crossdomain
 
-        if len(self.domains[u'http2']):
-            self.certificate = Certificate(self.name, self.domains[u'http2'])
-
         self.flush_nginx_config()
 
     def get_nginx_config(self):
@@ -90,7 +89,6 @@ class Service(object):
 
         try:
             deployed_nginx_config = self.read_nginx_config_file()
-
         except IOError:
             pass
 
@@ -99,24 +97,16 @@ class Service(object):
             config_file.write(nginx_config)
             config_file.close()
             logger.info('[service][%s]: got new nginx config %s' % (self.name, self.get_nginx_config_path()))
-            self.nginx_update_event.set()
+            NginxReloader.queue_reload()
 
     def get_nginx_config_path(self):
-        return config.NGINX_CONFIG_PATH + self.id
+        return os.path.join(config.NGINX_CONFIG_PATH, self.id + '.conf')
 
     def read_nginx_config_file(self):
         with open(self.get_nginx_config_path(), 'r') as config_file:
             config_content = config_file.read()
             config_file.close()
             return config_content
-
-    @tornado.gen.coroutine
-    def nginx_reload(self):
-        while True:
-            yield self.nginx_update_event.wait()
-            self.nginx_update_event.clear()
-            logger.info('[nginx]: reload')
-            subprocess.check_call([config.NGINX_BINARY, '-s', 'reload'])
 
     def validate(self):
         """

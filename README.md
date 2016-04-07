@@ -23,8 +23,8 @@ Consul service config example
 }
 ```
 
-Vergilius looks for registred services with tags `http` and `http2`, creates upstream with all nodes with this service,
-and routes all requests from `(www.)?service.example.com` and `*.(www.)?service.example.com` to services based on nginx
+Vergilius looks for registered services with tags `http` and `http2`, creates upstream with all containers of this service,
+routes requests from `(www.)?service.example.com` and `*.(www.)?service.example.com` to containers using nginx
 `least_conn` balancing algorithm.
 
 # how http2 works
@@ -41,10 +41,10 @@ Fill `vergilius/key.pem` from previous section and run.
 
 Environment variables:
 - `CONSUL_HOST` - consul ip, by default - default route gateway
-- `ADMIN_URL` - web interface, by default: `vergilius.dev`
 
-# misc service tags
+# service configuration
 
+Additional tags: 
 - `allow_crossdomain` — allow all crossdomain xhr communication for service.
 
 # plugins
@@ -52,7 +52,7 @@ Environment variables:
 See our organisation's [repos](https://github.com/devopsftw?utf8=%E2%9C%93&query=vergilius-) for official plugins
 
 There are [letsencrypt/acme](https://github.com/devopsftw/vergilius-acme) and 
-[doorman (oauth proxy)](https://github.com/devopsftw/vergilius-doorman) integrations available 
+[doorman (oauth proxy)](https://github.com/devopsftw/vergilius-doorman) integrations will be available soon. 
 
 # TODO
 

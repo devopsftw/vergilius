@@ -1,10 +1,11 @@
 import threading
-import unittest
 import time
+import unittest
+
 import tornado
+from vergilius import consul
 
 from loop.service_watcher import ServiceWatcher
-from vergilius import consul
 
 
 def start_tornado():

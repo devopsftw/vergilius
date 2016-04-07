@@ -1,7 +1,8 @@
 import unittest
 
 from vergilius import consul
-from vergilius.models.service import Service
+
+from models import Service
 
 
 class Test(unittest.TestCase):

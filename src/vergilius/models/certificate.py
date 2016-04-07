@@ -1,13 +1,12 @@
 import os
 import time
+from tornado import ioloop
 
 from consul import tornado, base
+from vergilius import consul, logger, certificate_provider, config
 
-from vergilius import config, consul, logger, certificate_provider
-from vergilius.config import NGINX_CONFIG_PATH
-
-if not os.path.exists(os.path.join(NGINX_CONFIG_PATH, 'certs')):
-    os.mkdir(os.path.join(NGINX_CONFIG_PATH, 'certs'), 0777)
+if not os.path.exists(os.path.join(config.NGINX_CONFIG_PATH, 'certs')):
+    os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'), 0777)
 
 
 class Certificate(object):
@@ -15,18 +14,22 @@ class Certificate(object):
 
     def __init__(self, service, domains):
         """
+        :type domains: set
         :type service: Service - service name got from consul
         """
         self.expires = 0
         self.service = service
-        self.domains = domains
+        self.domains = sorted(domains)
         self.key_domains = ''
-        self.id = '|'.join(sorted(domains))
+        self.id = '|'.join(self.domains)
 
         self.private_key = None
         self.public_key = None
 
         self.active = True
+        self.lock_session_id = None
+
+        ioloop.IOLoop.instance().add_callback(self.unlock)
         self.fetch()
         self.watch()
 
@@ -55,17 +58,16 @@ class Certificate(object):
             if not self.validate():
                 logger.warn('[certificate][%s]: cant validate existing keys' % self.service.id)
                 self.discard_certificate()
-                self.request_certificate()
+                if not self.request_certificate():
+                    return False
             else:
                 logger.debug('[certificate][%s]: using existing keys' % self.service.id)
         else:
-            self.request_certificate()
+            if not self.request_certificate():
+                return False
 
         self.write_certificate_files()
-
-    def __del__(self):
-        self.active = False
-        self.delete_certificate_files()
+        return True
 
     def write_certificate_files(self):
         key_file = open(self.get_key_path(), 'w+')
@@ -77,23 +79,40 @@ class Certificate(object):
         pem_file.close()
 
     def delete_certificate_files(self):
-        os.remove(self.get_key_path())
-        os.remove(self.get_cert_path())
+        if os.path.exists(self.get_key_path()):
+            os.remove(self.get_key_path())
+        if os.path.exists(self.get_cert_path()):
+            os.remove(self.get_cert_path())
 
     def get_key_path(self):
-        return os.path.join(NGINX_CONFIG_PATH, 'certs', self.service.id + '.key')
+        return os.path.join(config.NGINX_CONFIG_PATH, 'certs', self.service.id + '.key')
 
     def get_cert_path(self):
-        return os.path.join(NGINX_CONFIG_PATH, 'certs', self.service.id + '.pem')
+        return os.path.join(config.NGINX_CONFIG_PATH, 'certs', self.service.id + '.pem')
+
+    def lock(self):
+        """
+        Create a lock in consul to prevent certificate request race condition
+        """
+        self.lock_session_id = consul.session.create(behavior='delete')
+        return consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
+
+    def unlock(self):
+        if not self.lock_session_id:
+            return
+
+        # consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
+        consul.session.destroy(self.lock_session_id)
+        self.lock_session_id = None
 
     def request_certificate(self):
         logger.debug('[certificate][%s] Requesting new keys for %s ' % (self.service.name, self.domains))
-        session_id = consul.session.create(behavior='delete')
-        if not consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=session_id):
+
+        if not self.lock():
             logger.debug('[certificate][%s] failed to acquire lock for keys generation' % self.service.name)
             return False
 
-        data = certificate_provider.gencert(self.service.id, self.domains)
+        data = certificate_provider.get_certificate(self.service.id, self.domains)
 
         with open(data['private_key'], 'r') as f:
             self.private_key = f.read()
@@ -109,8 +128,7 @@ class Certificate(object):
         self.key_domains = self.serialize_domains()
         consul.kv.put('vergilius/certificates/%s/expires' % self.service.id, str(self.expires))
         consul.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
-        consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=session_id)
-        consul.session.destroy(session_id)
+        self.unlock()
         logger.info('[certificate][%s]: got new keys for %s ' % (self.service.name, self.domains))
 
     def serialize_domains(self):
@@ -134,3 +152,7 @@ class Certificate(object):
             return False
 
         return True
+
+    def __del__(self):
+        self.active = False
+        self.delete_certificate_files()

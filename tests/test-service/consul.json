@@ -1,0 +1,14 @@
+{
+  "data_dir": "/tmp/consul",
+  "datacenter": "${DC:-unknown}",
+  "service": {
+    "name": "test",
+    "tags": [
+      "http",
+      "http:example.com",
+      "http2",
+      "http2:http2.example.com"
+    ],
+    "port": 80
+  }
+}
