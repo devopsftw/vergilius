@@ -2,9 +2,8 @@ import unittest
 
 from mock import mock
 from vergilius import consul
-
-from models import Certificate
-from models import Service
+from vergilius.models.certificate import Certificate
+from vergilius.models.service import Service
 
 
 class Test(unittest.TestCase):
@@ -17,9 +16,9 @@ class Test(unittest.TestCase):
         consul.kv.delete('vergilius', True)
 
     def test_keys_request(self):
-        cert = Certificate(service=self.service, domains=('example.com',))
+        cert = Certificate(service=self.service, domains=set('example.com'))
         self.assertTrue(cert.validate(), 'got valid keys')
 
         with mock.patch.object(Certificate, 'request_certificate', return_value={}) as mock_method:
-            Certificate(service=self.service, domains=('example.com',))
+            Certificate(service=self.service, domains=set('example.com'))
             self.assertFalse(mock_method.called, 'check if existing keys are not requested from provider')

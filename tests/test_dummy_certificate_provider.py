@@ -1,6 +1,6 @@
 import unittest
 
-from src.vergilius import DummyCertificateProvider
+from vergilius import DummyCertificateProvider
 
 provider = DummyCertificateProvider()
 

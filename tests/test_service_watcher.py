@@ -4,8 +4,7 @@ import unittest
 
 import tornado
 from vergilius import consul
-
-from loop.service_watcher import ServiceWatcher
+from vergilius.loop.service_watcher import ServiceWatcher
 
 
 def start_tornado():
@@ -30,7 +29,7 @@ class Test(unittest.TestCase):
         consul.agent.service.deregister('test')
 
     def test_poll(self):
-        consul.agent.service.register('test', 'test', tags=['http'])
+        consul.agent.service.register('test', 'test', tags=['http'], port=80)
         time.sleep(1)
         self.assertTrue(self.watcher.services['test'], 'service registered')
         consul.agent.service.deregister('test')
