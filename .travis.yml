@@ -11,11 +11,11 @@ before_install:
 - docker run -d --net=host e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc docker -domain test -server
 - docker run -d --net=host -v /etc/nginx/conf.d/:/etc/nginx/conf.d/ --name nginx nginx
 - docker ps -a
-- echo -e '#!/bin/sh\nexec docker exec nginx nginx $@' > "$NGINX_BIN" && chmod +x "$NGINX_BIN"
+- echo -e '#!/bin/sh\nexec docker exec nginx nginx $@' > "$NGINX_BINARY" && chmod +x "$NGINX_BINARY"
 - mkdir $DATA_PATH $NGINX_CONFIG_PATH
 
 env:
- - NGINX_BINARY=/usr/bin/nginx NGINX_CONFIG_PATH=/tmp/nginx DATA_PATH=/tmp/data SECRET=travis
+ - NGINX_BINARY="$(pwd)/nginx.sh" DATA_PATH="$(pwd)/data" NGINX_CONFIG_PATH="$DATA_PATH/nginx" SECRET=travis
 
 install: "python src/setup.py install"
 script: nosetests

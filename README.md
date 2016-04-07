@@ -1,6 +1,7 @@
 Vergilius
 =========
 nginx http router for docker cluster based on consul
+[![Build Status](https://travis-ci.org/devopsftw/vergilius.svg?branch=master)](https://travis-ci.org/devopsftw/vergilius)
 
 # what is that
 Docker image with nginx and tornado app, that has an opinion on how to route traffic to docker containers 
