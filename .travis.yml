@@ -13,10 +13,9 @@ before_install:
 - docker ps -a
 - docker logs consul
 - echo -e '#!/bin/sh\nexec docker exec nginx nginx $@' > "$NGINX_BINARY" && chmod +x "$NGINX_BINARY"
-- mkdir $DATA_PATH $NGINX_CONFIG_PATH
 
 env:
- - NGINX_BINARY="$HOME/nginx.sh" DATA_PATH="$HOME/data" NGINX_CONFIG_PATH="$DATA_PATH/nginx" SECRET=travis
+ - NGINX_BINARY="$HOME/nginx.sh" DATA_PATH=$HOME NGINX_CONFIG_PATH=$HOME SECRET=travis
 
 install: "python src/setup.py install"
 script: nosetests
