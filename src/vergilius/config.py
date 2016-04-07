@@ -11,4 +11,10 @@ NGINX_HTTP2_PORT = os.environ.get('NGINX_HTTP2_PORT', 443)
 
 ACME_DIRECTORY_URL = os.environ.get('ACME_DIRECTORY_URL', 'https://acme-staging.api.letsencrypt.org/directory')
 
-SSL_EMAIL = os.environ.get('SSL_EMAIL', 'root@localhost')
+OPENSSL_BINARY = os.environ.get('OPENSSL_BINARY', '/usr/bin/openssl')
+
+EMAIL = os.environ.get('EMAIL', 'root@localhost')
+SECRET = os.environ.get('SECRET')
+
+if not SECRET:
+    raise Exception('No secret specified!')

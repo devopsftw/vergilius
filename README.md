@@ -6,6 +6,18 @@ nginx http router for docker cluster based on consul
 Docker image with nginx and tornado app, that has an opinion on how to route traffic to docker containers 
 registered in consul.
 
+# run
+```bash
+docker run -d -p 80:80 -p 433:433 --env-file .env --name vergilius devopsftw/vergilius
+```
+
+Example `.env` file:
+```bash
+CONSUL_HOST=127.0.0.1
+SECRET=passw0rd
+EMAIL=root@localhost
+```
+
 # how routing works
 
 Consul service config example
@@ -30,17 +42,14 @@ routes requests from `(www.)?service.example.com` and `*.(www.)?service.example.
 # how http2 works
 
 To use `http2` proxy, use `http2` tag instead of `http` or use both. Vergilius will try to acquire certificate from
-plugin or create self signed certificate. To make it work you should specify `vergilius/key.pem` key
- in your consul key/value storage.
+plugin or create self signed certificate. 
 
-- `vergilius/key.pem` — private RSA key with no password
+# identity
+Vergilius has an identity. To move vergilius seamlessly, copy `vergilius/identity` consul folder to your 
+new cluster. If no identity found on start - it will be created for you.
 
-# how to run
-
-Fill `vergilius/key.pem` from previous section and run.
-
-Environment variables:
-- `CONSUL_HOST` - consul ip, by default - default route gateway
+- Consul key: `vergilius/identity/private_key` — private dsa3 encrypted RSA key with password specified in env `SECRET`
+- Environment variable: `SECRET` - used for any encryption in vergilius
 
 # service configuration
 

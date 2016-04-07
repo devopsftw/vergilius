@@ -6,8 +6,7 @@ from consul import tornado, base
 from vergilius import consul, logger, certificate_provider, config
 
 if not os.path.exists(os.path.join(config.NGINX_CONFIG_PATH, 'certs')):
-    os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'), 0777)
-
+    os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'))
 
 class Certificate(object):
     tc = tornado.Consul(host=config.CONSUL_HOST)
