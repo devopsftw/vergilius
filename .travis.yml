@@ -15,10 +15,7 @@ before_install:
 - mkdir $DATA_PATH $NGINX_CONFIG_PATH
 
 env:
- - NGINX_BINARY=/usr/bin/nginx
- - SECRET=travis
- - DATA_PATH=/tmp/data
- - NGINX_CONFIG_PATH=/tmp/nginx
+ - NGINX_BINARY=/usr/bin/nginx NGINX_CONFIG_PATH=/tmp/nginx DATA_PATH=/tmp/data SECRET=travis
 
 install: "python src/setup.py install"
 script: nosetests
