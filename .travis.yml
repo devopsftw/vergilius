@@ -1,6 +1,5 @@
 language: python
 python:
-  - "2.6"
   - "2.7"
 
 services:
@@ -12,7 +11,7 @@ before_install:
 - docker run -d --net=host e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc docker -domain test -server
 - docker run -d --net=host -v /etc/nginx/conf.d/:/etc/nginx/conf.d/ --name nginx nginx
 - docker ps -a
-- echo -e '#!/bin/sh\nexec docker exec nginx nginx $@' > $NGINX_BIN && chmod +x $NGINX_BIN
+- echo -e '#!/bin/sh\nexec docker exec nginx nginx $@' > "$NGINX_BIN" && chmod +x "$NGINX_BIN"
 - mkdir $DATA_PATH $NGINX_CONFIG_PATH
 
 env:
