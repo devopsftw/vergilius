@@ -7,7 +7,8 @@ services:
   - docker
 
 before_install:
-- docker pull e96tech/consul-server nginx
+- docker pull e96tech/consul-server
+- docker pull nginx
 - docker run -d --net=host e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc docker -domain test -server
 - docker run -d --net=host -v /etc/nginx/conf.d/:/etc/nginx/conf.d/ --name nginx nginx
 - docker ps -a
