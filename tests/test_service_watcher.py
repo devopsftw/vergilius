@@ -1,37 +1,23 @@
-import threading
 import time
-import unittest
 
-import tornado
+from base_test import BaseTest
 from vergilius import consul
-from vergilius.loop.service_watcher import ServiceWatcher
 
 
-def start_tornado():
-    tornado.ioloop.IOLoop.instance().start()
-
-
-class Test(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.watcher = ServiceWatcher()
-        threading.Thread(target=start_tornado).start()
-
-    @classmethod
-    def tearDownClass(cls):
-        tornado.ioloop.IOLoop.instance().stop()
-
-    def setUp(self):
-        super(Test, self).setUp()
-        consul.kv.delete('vergilius', True)
-
-    def tearDown(self):
-        consul.agent.service.deregister('test')
-
+class Test(BaseTest):
     def test_poll(self):
         consul.agent.service.register('test', 'test', tags=['http'], port=80)
-        time.sleep(1)
-        self.assertTrue(self.watcher.services['test'], 'service registered')
+        time.sleep(2)
+        self.assertTrue('test' in self.watcher.services, 'service registered')
         consul.agent.service.deregister('test')
         time.sleep(1)
         self.assertFalse('test' in self.watcher.services.keys(), 'service unregistered')
+
+    def test_empty_service(self):
+        consul.agent.service.register('test', 'test')
+
+        time.sleep(2)
+        self.assertFalse('test' in self.watcher.services, 'service not registered')
+
+    def tearDown(self):
+        consul.agent.service.deregister('test')

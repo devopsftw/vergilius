@@ -5,8 +5,6 @@ from tornado import ioloop
 from consul import tornado, base
 from vergilius import consul, logger, certificate_provider, config
 
-if not os.path.exists(os.path.join(config.NGINX_CONFIG_PATH, 'certs')):
-    os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'))
 
 class Certificate(object):
     tc = tornado.Consul(host=config.CONSUL_HOST)
@@ -27,6 +25,9 @@ class Certificate(object):
 
         self.active = True
         self.lock_session_id = None
+
+        if not os.path.exists(os.path.join(config.NGINX_CONFIG_PATH, 'certs')):
+            os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'))
 
         ioloop.IOLoop.instance().add_callback(self.unlock)
         self.fetch()
@@ -100,7 +101,7 @@ class Certificate(object):
         if not self.lock_session_id:
             return
 
-        # consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
+        consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
         consul.session.destroy(self.lock_session_id)
         self.lock_session_id = None
 
@@ -111,24 +112,30 @@ class Certificate(object):
             logger.debug('[certificate][%s] failed to acquire lock for keys generation' % self.service.name)
             return False
 
-        data = certificate_provider.get_certificate(self.service.id, self.domains)
+        try:
+            data = certificate_provider.get_certificate(self.service.id, self.domains)
 
-        with open(data['private_key'], 'r') as f:
-            self.private_key = f.read()
-            f.close()
-            consul.kv.put('vergilius/certificates/%s/private_key' % self.service.id, self.private_key)
+            with open(data['private_key'], 'r') as f:
+                self.private_key = f.read()
+                f.close()
+                consul.kv.put('vergilius/certificates/%s/private_key' % self.service.id, self.private_key)
 
-        with open(data['public_key'], 'r') as f:
-            self.public_key = f.read()
-            f.close()
-            consul.kv.put('vergilius/certificates/%s/public_key' % self.service.id, self.public_key)
+            with open(data['public_key'], 'r') as f:
+                self.public_key = f.read()
+                f.close()
+                consul.kv.put('vergilius/certificates/%s/public_key' % self.service.id, self.public_key)
 
-        self.expires = data['expires']
-        self.key_domains = self.serialize_domains()
-        consul.kv.put('vergilius/certificates/%s/expires' % self.service.id, str(self.expires))
-        consul.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
-        self.unlock()
-        logger.info('[certificate][%s]: got new keys for %s ' % (self.service.name, self.domains))
+            self.expires = data['expires']
+            self.key_domains = self.serialize_domains()
+            consul.kv.put('vergilius/certificates/%s/expires' % self.service.id, str(self.expires))
+            consul.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
+            logger.info('[certificate][%s]: got new keys for %s ' % (self.service.name, self.domains))
+            self.write_certificate_files()
+        except Exception as e:
+            logger.error(e)
+            raise e
+        finally:
+            self.unlock()
 
     def serialize_domains(self):
         return '|'.join(sorted(self.domains))

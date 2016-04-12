@@ -1,0 +1,22 @@
+machine:
+  python:
+    version: 2.7
+  services:
+    - docker
+  environment:
+    NGINX_HTTP2_PORT: 10443
+    NGINX_HTTP_PORT: 10080
+    DATA_PATH: /tmp/data
+    NGINX_CONFIG_PATH: /tmp/nginx
+    SECRET: 123
+
+dependencies:
+  pre:
+    - pip install setuptools==17.1
+    - sudo add-apt-repository -y ppa:nginx/development; sudo apt-get update; sudo apt-get install nginx
+    - sudo chmod -R 0777 /var/log/nginx
+
+test:
+  pre:
+    - docker run -d -p 8500:8500 e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc circle -domain local
+    - curl --retry 10 --retry-delay 5 -v http://localhost:8500

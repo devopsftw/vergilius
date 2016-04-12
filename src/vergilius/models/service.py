@@ -28,6 +28,9 @@ class Service(object):
         self.active = True
         self.certificate = None
 
+        if not os.path.exists(config.NGINX_CONFIG_PATH):
+            os.mkdir(config.NGINX_CONFIG_PATH)
+
         self.fetch()
         self.watch()
 
@@ -46,11 +49,24 @@ class Service(object):
                 pass
 
     def parse_data(self, data):
+        """
+
+        :type data: set[]
+        """
         for protocol in self.domains.iterkeys():
             self.domains[protocol].clear()
 
         allow_crossdomain = False
         for node in data:
+            print(node)
+            if not node[u'ServicePort']:
+                logger.warn('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
+                continue
+
+            if node[u'ServiceTags'] is None:
+                logger.warn('[service][%s]: Node %s is ignored due no ServiceTags' % (self.id, node[u'Node']))
+                continue
+
             self.nodes[node['Node']] = {
                 'port': node[u'ServicePort'],
                 'address': node[u'ServiceAddress'] or node[u'Address'],

@@ -2,11 +2,13 @@ Vergilius
 =========
 nginx http router for docker cluster based on consul
 
-# what is that
+[![Circle CI](https://circleci.com/gh/devopsftw/vergilius/tree/master.svg?style=svg)](https://circleci.com/gh/devopsftw/vergilius/tree/master)
+
+#### what is that
 Docker image with nginx and tornado app, that has an opinion on how to route traffic to docker containers 
 registered in consul.
 
-# run
+#### run
 ```bash
 docker run -d -p 80:80 -p 433:433 --env-file .env --name vergilius devopsftw/vergilius
 ```
@@ -18,7 +20,7 @@ SECRET=passw0rd
 EMAIL=root@localhost
 ```
 
-# how routing works
+#### how routing works
 
 Consul service config example
 ```json
@@ -39,12 +41,12 @@ Vergilius looks for registered services with tags `http` and `http2`, creates up
 routes requests from `(www.)?service.example.com` and `*.(www.)?service.example.com` to containers using nginx
 `least_conn` balancing algorithm.
 
-# how http2 works
+#### how http2 works
 
 To use `http2` proxy, use `http2` tag instead of `http` or use both. Vergilius will try to acquire certificate from
 plugin or create self signed certificate. 
 
-# identity
+#### identity
 Vergilius has an identity. To move vergilius seamlessly, copy `vergilius/identity` consul kv folder to your 
 new cluster. If no identity found on start - it will be created for you.
 
@@ -52,19 +54,23 @@ new cluster. If no identity found on start - it will be created for you.
 used for certificates signing.
 - Environment variable: `SECRET` - used for any encryption in vergilius
 
-# service configuration
+#### service configuration
 
 Additional tags: 
 - `allow_crossdomain` — allow all crossdomain xhr communication for service.
 
-# plugins
+#### plugins
 
 See our organisation's [repos](https://github.com/devopsftw?utf8=%E2%9C%93&query=vergilius-) for official plugins
 
 There are [letsencrypt/acme](https://github.com/devopsftw/vergilius-acme) and 
 [doorman (oauth proxy)](https://github.com/devopsftw/vergilius-doorman) integrations will be available soon. 
 
-# TODO
+#### custom configs
+
+To add custom nginx configs simply mount your configs folder to `/etc/nginx/sites-enabled`
+
+#### TODO
 
 - readthedocs, sphinx
 - docker events + labels, Apache Zookeeper, etcd, eureka, etc. support?

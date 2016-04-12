@@ -1,14 +1,13 @@
-import unittest
 
+from base_test import BaseTest
 from vergilius import consul
 from vergilius.models.service import Service
 
 
-class Test(unittest.TestCase):
+class Test(BaseTest):
     def setUp(self):
         super(Test, self).setUp()
         consul.kv.delete('vergilius', True)
-
 
     def test_watcher(self):
         pass

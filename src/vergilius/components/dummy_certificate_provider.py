@@ -20,31 +20,37 @@ def openssl(*args):
     subprocess.check_call(cmdline)
 
 
+def check_paths():
+    if not os.path.exists(DATA_PATH):
+        os.mkdir(DATA_PATH)
+
+    if not os.path.exists(os.path.join(DATA_PATH, 'domains')):
+        os.mkdir(os.path.join(DATA_PATH, 'domains'))
+
+
 class DummyCertificateProvider(object):
     """
     Issues self signed certificates.
     """
     zope.interface.implements(ICertificateProvider)
 
-    def __init__(self):
-        if not os.path.exists(DATA_PATH):
-            os.mkdir(DATA_PATH)
-
-        if not os.path.exists(os.path.join(DATA_PATH, 'domains')):
-            os.mkdir(os.path.join(DATA_PATH, 'domains'))
-
     @classmethod
     def dfile(cls, id, ext):
         return os.path.join(DATA_PATH, 'domains', '%s.%s' % (id, ext))
 
     def get_certificate(self, id, domains, keysize=KEY_SIZE, days=DAYS):
+        """
+        :param id: string
+        :type domains: set
+        """
+        check_paths()
 
         if not os.path.exists(self.dfile(id, 'key')):
             openssl('genrsa', '-out', self.dfile(id, 'key'), str(keysize))
 
         config_file = open(self.dfile(id, 'config'), 'w')
         config_file.write(vergilius.template_loader.load('ssl.html').generate(
-                domain=domains[0], dns_list=domains, email=vergilius.config.EMAIL
+                domain=sorted(list(domains))[0], dns_list=domains, email=vergilius.config.EMAIL
         ))
         config_file.close()
 
@@ -54,9 +60,10 @@ class DummyCertificateProvider(object):
         openssl('x509', '-req',
                 '-days', str(days),
                 '-in', self.dfile(id, 'request'),
-                '-CA', vergilius.identity.get_certificate_path(),
-                '-CAkey', vergilius.identity.get_private_key_path(),
-                '-set_serial', '0x%s' % hashlib.md5(domains[0] + str(datetime.datetime.now())).hexdigest(),
+                '-CA', vergilius.Vergilius.identity.get_certificate_path(),
+                '-CAkey', vergilius.Vergilius.identity.get_private_key_path(),
+                '-set_serial',
+                '0x%s' % hashlib.md5(sorted(list(domains))[0] + str(datetime.datetime.now())).hexdigest(),
                 '-out', self.dfile(id, 'cert'),
                 '-extensions', 'v3_req',
                 '-extfile', self.dfile(id, 'config'),

@@ -17,13 +17,8 @@ class Identity(object):
     Stores private keys, certificate in consul.
     Generates new identity if not specified
     """
+
     def __init__(self):
-        if not os.path.exists(IDENTITY_PATH):
-            os.mkdir(IDENTITY_PATH)
-
-        if not self.get_private_key():
-            self.generate_identity()
-
         self.write_files()
 
     def get_private_key(self):
@@ -75,6 +70,12 @@ class Identity(object):
         certificate_file.close()
 
     def write_files(self):
+        if not os.path.exists(IDENTITY_PATH):
+            os.mkdir(IDENTITY_PATH)
+
+        if not self.get_private_key():
+            self.generate_identity()
+
         private_key_file = open(self.get_private_key_path(), 'w+')
         private_key_file.write(self.get_private_key())
         private_key_file.close()

@@ -15,4 +15,11 @@ certificate_provider = DummyCertificateProvider()
 
 consul = Consul(host=config.CONSUL_HOST)
 consul_tornado = consul_from_tornado.Consul(host=config.CONSUL_HOST)
-identity = Identity()
+
+
+class Vergilius(object):
+    identity = None
+
+    @classmethod
+    def init(cls):
+        cls.identity = Identity()
