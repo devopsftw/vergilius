@@ -26,8 +26,9 @@ class ServiceWatcher(object):
         # check if service has any of our tags
         services_to_publish = dict((k, v) for k, v in data.items() if any(x in v for x in [u'http', u'http2']))
         for service_name in services_to_publish:
-            vergilius.logger.info('[service watcher]: new service: %s' % service_name)
-            self.services[service_name] = Service(service_name)
+            if service_name not in self.services:
+                vergilius.logger.info('[service watcher]: new service: %s' % service_name)
+                self.services[service_name] = Service(service_name)
 
         # cleanup stale services
         for service_name in self.services.keys():

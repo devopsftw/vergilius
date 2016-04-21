@@ -58,7 +58,6 @@ class Service(object):
 
         allow_crossdomain = False
         for node in data:
-            print(node)
             if not node[u'ServicePort']:
                 logger.warn('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
                 continue
