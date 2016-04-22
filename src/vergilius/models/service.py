@@ -145,6 +145,7 @@ class Service(object):
             return_code = 1
         finally:
             os.unlink(service_config_file.name)
+            os.unlink('%s.pid' % service_config_file.name)
             os.unlink(nginx_config_file.name)
 
         return return_code == 0
