@@ -63,7 +63,7 @@ class Service(object):
                 logger.warn('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
                 continue
 
-            if node[u'Service']][u'Tags'] is None:
+            if node[u'Service'][u'Tags'] is None:
                 logger.warn('[service][%s]: Node %s is ignored due no ServiceTags' % (self.id, node[u'Node']))
                 continue
 
