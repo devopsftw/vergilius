@@ -35,7 +35,7 @@ class Service(object):
         self.watch()
 
     def fetch(self):
-        index, data = consul.catalog.service(self.name)
+        index, data = consul.health.service(self.name, passing=True)
         self.parse_data(data)
 
     @tornado.gen.coroutine
@@ -43,7 +43,7 @@ class Service(object):
         index = None
         while True and self.active:
             try:
-                index, data = yield consul_tornado.catalog.service(self.name, index, wait=None)
+                index, data = yield consul_tornado.health.service(self.name, index, wait=None, passing=True)
                 self.parse_data(data)
             except base.Timeout:
                 pass
@@ -59,27 +59,27 @@ class Service(object):
         allow_crossdomain = False
         self.nodes = {}
         for node in data:
-            if not node[u'ServicePort']:
+            if not node[u'Service'][u'Port']:
                 logger.warn('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
                 continue
 
-            if node[u'ServiceTags'] is None:
+            if node[u'Service'][u'Tags'] is None:
                 logger.warn('[service][%s]: Node %s is ignored due no ServiceTags' % (self.id, node[u'Node']))
                 continue
 
-            self.nodes[node['Node']] = {
-                'port': node[u'ServicePort'],
-                'address': node[u'ServiceAddress'] or node[u'Address'],
-                'tags': node[u'ServiceTags'],
+            self.nodes[node['Node']['Node']] = {
+                'port': node[u'Service'][u'Port'],
+                'address': node[u'Service'][u'Address'] or node[u'Node'][u'Address'],
+                'tags': node[u'Service'][u'Tags'],
             }
 
-            if u'allow_crossdomain' in node[u'ServiceTags']:
+            if u'allow_crossdomain' in node[u'Service'][u'Tags']:
                 allow_crossdomain = True
 
             for protocol in [u'http', u'http2']:
-                if protocol in node[u'ServiceTags']:
+                if protocol in node[u'Service'][u'Tags']:
                     self.domains[protocol].update(
-                            tag.replace(protocol + ':', '') for tag in node[u'ServiceTags'] if
+                            tag.replace(protocol + ':', '') for tag in node[u'Service'][u'Tags'] if
                             tag.startswith(protocol + ':')
                     )
 
