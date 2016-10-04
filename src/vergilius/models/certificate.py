@@ -94,7 +94,6 @@ class Certificate(object):
         """
         Create a lock in consul to prevent certificate request race condition
         """
-        print('locking')
         self.lock_session_id = consul.session.create(behavior='delete')
         return consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
 
