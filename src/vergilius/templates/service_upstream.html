@@ -1,0 +1,8 @@
+{% whitespace all%}
+upstream {{service.id}} {
+    hash $remote_addr consistent;
+
+    {% for node_name in service.nodes %}server {{ service.nodes[node_name]['address'] }}:{{ service.nodes[node_name]['port'] }};
+    {% end %}
+    {% if not service.nodes %}server 127.0.0.1:6666;{% end %}
+}

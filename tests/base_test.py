@@ -9,8 +9,8 @@ import tornado
 
 import vergilius
 from vergilius import consul, logger
+from vergilius.components import port_allocator
 from vergilius.loop.service_watcher import ServiceWatcher
-from vergilius.models.identity import Identity
 
 out_hdlr = logging.StreamHandler(sys.stdout)
 out_hdlr.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
@@ -44,7 +44,12 @@ class BaseTest(unittest.TestCase):
 
         try:
             os.mkdir(vergilius.config.DATA_PATH)
+        except OSError as e:
+            print(e)
+
+        try:
             os.mkdir(vergilius.config.NGINX_CONFIG_PATH)
+            os.mkdir(os.path.join(vergilius.config.NGINX_CONFIG_PATH, 'certs'))
         except OSError as e:
             print(e)
 
@@ -53,6 +58,10 @@ class BaseTest(unittest.TestCase):
     def tearDown(self):
         super(BaseTest, self).tearDown()
         consul.kv.delete('vergilius', True)
+        port_allocator.allocated = set()
 
-        shutil.rmtree(vergilius.config.NGINX_CONFIG_PATH)
-        shutil.rmtree(vergilius.config.DATA_PATH)
+        try:
+            shutil.rmtree(vergilius.config.NGINX_CONFIG_PATH)
+            shutil.rmtree(vergilius.config.DATA_PATH)
+        except OSError as e:
+            print(e)

@@ -8,6 +8,13 @@ events {
 
 
 http {
-    include {{service_config}};
+    include {{service_upstream}};
+    include {{service_http}};
+    include {{service_http2}};
 }
 
+stream {
+    include {{service_upstream}};
+    include {{service_tcp}};
+    include {{service_udp}};
+}
