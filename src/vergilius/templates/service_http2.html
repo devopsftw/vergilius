@@ -1,0 +1,31 @@
+{% whitespace all%}
+{% if len(service.binds['http2']) and service.certificate.private_key and service.certificate.public_key %}
+server {
+    server_name{% for domain in service.binds['http2'] %} {{ domain }} *.{{ domain }}{% end %};
+    listen {{config.NGINX_HTTP2_PORT}} ssl http2;
+
+    ssl_certificate     {{service.certificate.get_cert_path()}};
+    ssl_certificate_key {{service.certificate.get_key_path()}};
+
+    location / {
+        proxy_pass http://{{service.id}};
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        {% if service.allow_crossdomain %}
+        proxy_hide_header 'Access-Control-Allow-Origin';
+        add_header 'Access-Control-Allow-Origin' "$http_origin";
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+        add_header 'Access-Control-Allow-Credentials' 'true';
+        add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cookie,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Mx-ReqToken,X-Requested-With';
+
+        if ($request_method = 'OPTIONS' ) {
+            # if request method is options we immediately return with 200 OK.
+            return 200;
+        }
+        {% end %}
+    }
+}
+{% end %}

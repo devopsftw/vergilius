@@ -22,7 +22,11 @@ test:
     - curl --retry 10 --retry-delay 5 -v http://localhost:8500
 
 deployment:
-  dockerhub:
+  dockerhub_master:
     branch: master
     commands:
       - 'curl -H "Content-Type: application/json" --data "{\"source_type\": \"Branch\", \"source_name\": \"master\"}" -X POST https://registry.hub.docker.com/u/devopsftw/vergilius/trigger/ea3f932c-49b9-47e8-af0c-ec1d8615cda4/'
+  dockerhub_tag:
+    tag: /.*/
+    commands:
+      - 'curl -H "Content-Type: application/json" --data "{\"source_type\": \"Tag\", \"source_name\": \"$CIRCLE_TAG\"}" -X POST https://registry.hub.docker.com/u/devopsftw/vergilius/trigger/ea3f932c-49b9-47e8-af0c-ec1d8615cda4/'

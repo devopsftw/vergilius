@@ -19,9 +19,11 @@ RUN rm /etc/nginx/sites-enabled/* && mkdir -p /etc/nginx/sites-enabled/certs && 
     mkdir -p /data/dummy_ca/domains/
 
 ADD src /opt/vergilius
-RUN python /opt/vergilius/setup.py install
+RUN cd /opt/vergilius/ && python setup.py install
 WORKDIR /opt/vergilius/
 
-EXPOSE 80 443
+EXPOSE 80 443 7000-8000
+
+ENV DHPARAM_LENGTH 4096
 
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
