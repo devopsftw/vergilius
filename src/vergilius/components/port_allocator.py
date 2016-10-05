@@ -17,4 +17,4 @@ def allocate():
 
 
 def release(port):
-    allocated.remove(int(port))
+    allocated.discard(int(port))

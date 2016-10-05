@@ -69,11 +69,11 @@ class Service(object):
         self.nodes = {}
         for node in data:
             if not node[u'Service'][u'Port']:
-                logger.warn('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
+                logger.warn('[service][%s]: Node %s is ignored due no Service Port' % (self.id, node[u'Node'][u'Node']))
                 continue
 
             if node[u'Service'][u'Tags'] is None:
-                logger.warn('[service][%s]: Node %s is ignored due no ServiceTags' % (self.id, node[u'Node']))
+                logger.warn('[service][%s]: Node %s is ignored due no Service Tags' % (self.id, node[u'Node'][u'Node']))
                 continue
 
             self.nodes[node['Node']['Node']] = {
@@ -86,14 +86,14 @@ class Service(object):
                 allow_crossdomain = True
 
             for protocol in [u'http', u'http2']:
-                if protocol in node[u'ServiceTags']:
-                    self.domains[protocol].update(
-                            tag.replace(protocol + ':', '') for tag in node[u'ServiceTags'] if
+                if protocol in node[u'Service'][u'Tags']:
+                    self.binds[protocol].update(
+                            tag.replace(protocol + ':', '') for tag in node[u'Service'][u'Tags'] if
                             tag.startswith(protocol + ':')
                     )
 
             for protocol in ['tcp', 'udp']:
-                self.binds[protocol].update({node[u'ServicePort']})
+                self.binds[protocol].update({node[u'Service'][u'Port']})
 
         self.allow_crossdomain = allow_crossdomain
 

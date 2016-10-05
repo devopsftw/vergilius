@@ -1,3 +1,5 @@
+from mock import mock
+
 from base_test import BaseTest
 from vergilius import consul
 from vergilius.components import port_allocator
@@ -14,8 +16,8 @@ class Test(BaseTest):
 
         config_file = service.get_nginx_config_path('upstream')
         self.assertNotEqual(
-            service.read_nginx_config_file('upstream').find('server 127.0.0.1:6666'),
-            -1, 'config written and has backup 503')
+                service.read_nginx_config_file('upstream').find('server 127.0.0.1:6666'),
+                -1, 'config written and has backup 503')
         self.assertTrue(service.validate(), 'nginx config is valid')
         service.delete()
 
@@ -27,8 +29,8 @@ class Test(BaseTest):
         service.binds['http'] = {'example.com'}
 
         self.assertNotEqual(
-            service.get_nginx_config('http').find('server_name example.com *.example.com;'), -1,
-            'server_name and wildcard present')
+                service.get_nginx_config('http').find('server_name example.com *.example.com;'), -1,
+                'server_name and wildcard present')
         self.assertTrue(service.validate(), 'nginx config is valid')
 
     def test_http2(self):
@@ -37,29 +39,38 @@ class Test(BaseTest):
 
         self.assertTrue(service.validate(), 'nginx config is valid')
 
-    def test_upstream_nodes(self):
+    @mock.patch.object(Service, 'watch')
+    def test_upstream_nodes(self, _):
         service = Service(name='test service')
+
         service.binds['http'] = {'example.com'}
         service.nodes['test_node'] = {'address': '127.0.0.1', 'port': '10000'}
 
         self.assertTrue(service.validate(), 'nginx config is valid')
         config = service.get_nginx_config('upstream')
+
         self.assertNotEqual(config.find('server 127.0.0.1:10000;'), -1, 'upstream node present')
         self.assertEqual(config.find('server 127.0.0.1:6666'), -1, 'backup node deleted')
 
-    def test_tcp(self):
+    @mock.patch.object(Service, 'watch')
+    def test_tcp(self, _):
         service = Service(name='test service')
         service.binds['tcp'] = {'10000'}
         service.nodes['test_node'] = {'address': '127.0.0.1', 'port': '10000'}
 
         self.assertTrue(service.validate(), 'nginx config is valid')
+        config = service.get_nginx_config('tcp')
+        self.assertNotEqual(config.find('listen %s;' % service.port), -1, 'tcp listen valid')
 
-    def test_udp(self):
+    @mock.patch.object(Service, 'watch')
+    def test_udp(self, _):
         service = Service(name='test service')
         service.binds['udp'] = {'10000'}
         service.nodes['test_node'] = {'address': '127.0.0.1', 'port': '10000'}
 
         self.assertTrue(service.validate(), 'nginx config is valid')
+        config = service.get_nginx_config('udp')
+        self.assertNotEqual(config.find('listen %s udp;' % service.port), -1, 'udp listen valid')
 
     def test_port_allocate(self):
         service = Service(name='test service')
