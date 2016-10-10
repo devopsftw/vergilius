@@ -19,7 +19,7 @@ RUN rm /etc/nginx/sites-enabled/* && mkdir -p /etc/nginx/sites-enabled/certs && 
     mkdir -p /data/dummy_ca/domains/
 
 ADD src /opt/vergilius
-RUN python /opt/vergilius/setup.py install
+RUN cd /opt/vergilius/ && python setup.py install
 WORKDIR /opt/vergilius/
 
 EXPOSE 80 443
