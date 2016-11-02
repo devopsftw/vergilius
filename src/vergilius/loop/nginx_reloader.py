@@ -18,7 +18,7 @@ class NginxReloader(object):
             yield cls.nginx_update_event.wait()
             cls.nginx_update_event.clear()
             vergilius.logger.info('[nginx]: reload')
-            subprocess.check_call([vergilius.config.NGINX_BINARY, '-s', 'reload'])
+            subprocess.check_call([vergilius.config.NGINX_BINARY, '-s', 'reload'], stdout=subprocess.DEVNULL)
 
     @classmethod
     def queue_reload(cls):
