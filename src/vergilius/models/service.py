@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 import unicodedata
 
+from tornado.ioloop import IOLoop
+
 from consul import tornado, base
 from vergilius import config, consul_tornado, consul, logger, template_loader
 from vergilius.loop.nginx_reloader import NginxReloader
@@ -11,6 +13,8 @@ from vergilius.models.certificate import Certificate
 
 
 class Service(object):
+    active = False
+
     def __init__(self, name):
         """
         :type name: unicode - service name got from consul
@@ -21,8 +25,8 @@ class Service(object):
         self.allow_crossdomain = False
         self.nodes = {}
         self.domains = {
-            u'http': set(),
-            u'http2': set()
+            'http': set(),
+            'http2': set()
         }
 
         self.active = True
@@ -31,12 +35,8 @@ class Service(object):
         if not os.path.exists(config.NGINX_CONFIG_PATH):
             os.mkdir(config.NGINX_CONFIG_PATH)
 
-        self.fetch()
-        self.watch()
-
-    def fetch(self):
-        index, data = consul.health.service(self.name, passing=True)
-        self.parse_data(data)
+        # spawn service watcher
+        IOLoop.instance().spawn_callback(self.watch)
 
     @tornado.gen.coroutine
     def watch(self):
@@ -44,16 +44,19 @@ class Service(object):
         while True and self.active:
             try:
                 index, data = yield consul_tornado.health.service(self.name, index, wait=None, passing=True)
-                self.parse_data(data)
+                yield self.parse_data(data)
+                # okay, got data, now reload
+                yield self.update_config()
             except base.Timeout:
                 pass
 
+    @tornado.gen.coroutine
     def parse_data(self, data):
         """
 
         :type data: set[]
         """
-        for protocol in self.domains.iterkeys():
+        for protocol in self.domains.keys():
             self.domains[protocol].clear()
 
         allow_crossdomain = False
@@ -85,22 +88,38 @@ class Service(object):
 
         self.allow_crossdomain = allow_crossdomain
 
-        self.flush_nginx_config()
+    @tornado.gen.coroutine
+    def update_config(self):
+        # if we have http2 domain, create stub nginx config for ACME
+        if self.domains[u'http2']:
+
+            # if we dont have certificate yet, create stub config and wait
+            if not self.certificate:
+                logger.debug('[service][%s] flush stub config' % self.id)
+                self.flush_nginx_config(self.get_stub_config())
+                self.certificate = Certificate(service=self, domains=self.domains[u'http2'])
+                logger.debug('[service][%s] wait for cert' % self.id)
+                yield self.certificate.ready_event.wait()
+            logger.debug('[service][%s] load real https config' % self.id)
+            self.flush_nginx_config(self.get_nginx_config())
+        else:
+            logger.debug('[service][%s] flush real config' % self.id)
+            self.flush_nginx_config(self.get_nginx_config())
 
     def get_nginx_config(self):
         """
         Generate nginx config from service attributes
         """
-        if self.domains[u'http2']:
-            self.check_certificate()
         return template_loader.load('service.html').generate(service=self, config=config)
 
-    def flush_nginx_config(self):
-        if not self.validate():
+    def get_stub_config(self):
+        return template_loader.load('service_stub.html').generate(service=self, config=config)
+
+    def flush_nginx_config(self, nginx_config):
+        if not self.validate(nginx_config):
             logger.error('[service][%s]: failed to validate nginx config!' % self.id)
             return False
 
-        nginx_config = self.get_nginx_config()
         deployed_nginx_config = None
 
         try:
@@ -109,7 +128,7 @@ class Service(object):
             pass
 
         if deployed_nginx_config != nginx_config:
-            config_file = open(self.get_nginx_config_path(), 'w+')
+            config_file = open(self.get_nginx_config_path(), 'wb')
             config_file.write(nginx_config)
             config_file.close()
             logger.info('[service][%s]: got new nginx config %s' % (self.name, self.get_nginx_config_path()))
@@ -124,13 +143,13 @@ class Service(object):
             config_file.close()
             return config_content
 
-    def validate(self):
+    def validate(self, config_str):
         """
         Deploy temporary service & nginx config and validate it with nginx
         :return: bool
         """
         service_config_file = tempfile.NamedTemporaryFile(delete=False)
-        service_config_file.write(self.get_nginx_config())
+        service_config_file.write(config_str)
         service_config_file.close()
 
         nginx_config_file = tempfile.NamedTemporaryFile(delete=False)
@@ -141,7 +160,7 @@ class Service(object):
         nginx_config_file.close()
 
         try:
-            return_code = subprocess.check_call([config.NGINX_BINARY, '-t', '-c', nginx_config_file.name])
+            return_code = subprocess.check_call([config.NGINX_BINARY, '-t', '-c', nginx_config_file.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
             return_code = 1
         finally:
@@ -174,10 +193,7 @@ class Service(object):
         Normalizes string, converts to lowercase, removes non-alpha characters,
         and converts spaces to hyphens.
         """
-        string = unicodedata.normalize('NFKD', unicode(string)).encode('ascii', 'ignore')
-        string = unicode(re.sub('[^\w\s-]', '', string).strip().lower())
+        string = unicodedata.normalize('NFKD', string)
+        string = string.encode('ascii', 'ignore').decode()
+        string = str(re.sub('[^\w\s-]', '', str(string)).strip().lower())
         return re.sub('[-\s]+', '-', string)
-
-    def check_certificate(self):
-        if not self.certificate:
-            self.certificate = Certificate(service=self, domains=self.domains[u'http2'])

@@ -76,10 +76,10 @@ class Identity(object):
         if not self.get_private_key():
             self.generate_identity()
 
-        private_key_file = open(self.get_private_key_path(), 'w+')
+        private_key_file = open(self.get_private_key_path(), 'wb')
         private_key_file.write(self.get_private_key())
         private_key_file.close()
 
-        certificate_file = open(self.get_certificate_path(), 'w+')
+        certificate_file = open(self.get_certificate_path(), 'wb')
         certificate_file.write(self.get_certificate())
         certificate_file.close()

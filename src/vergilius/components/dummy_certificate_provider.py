@@ -3,7 +3,6 @@ import hashlib
 import os
 import subprocess
 import time
-import zope.interface
 
 import vergilius
 from vergilius.components.certificate_provider import ICertificateProvider
@@ -29,11 +28,6 @@ def check_paths():
 
 
 class DummyCertificateProvider(object):
-    """
-    Issues self signed certificates.
-    """
-    zope.interface.implements(ICertificateProvider)
-
     @classmethod
     def dfile(cls, id, ext):
         return os.path.join(DATA_PATH, 'domains', '%s.%s' % (id, ext))

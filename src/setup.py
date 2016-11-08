@@ -7,6 +7,9 @@ install_requires = [
     'setuptools>=1.0',
     'zope.component',
     'zope.interface',
+    'acme==0.9.3',
+    'cryptography>=0.8',
+    'PyOpenSSL>=0.13',
 ]
 
 setup(

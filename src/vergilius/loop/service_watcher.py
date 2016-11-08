@@ -1,8 +1,8 @@
 import vergilius
 
+from tornado.ioloop import IOLoop
 from consul import tornado, base
 from vergilius.models.service import Service
-
 
 class ServiceWatcher(object):
     def __init__(self):
@@ -10,7 +10,7 @@ class ServiceWatcher(object):
 
         self.data = {}
         self.modified = False
-        self.watch_services()
+        IOLoop.instance().spawn_callback(self.watch_services)
 
     @tornado.gen.coroutine
     def watch_services(self):
@@ -32,6 +32,6 @@ class ServiceWatcher(object):
 
         # cleanup stale services
         for service_name in self.services.keys():
-            if service_name not in services_to_publish.iterkeys():
+            if service_name not in services_to_publish.keys():
                 vergilius.logger.info('[service watcher]: removing stale service: %s' % service_name)
                 del self.services[service_name]

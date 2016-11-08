@@ -1,13 +1,17 @@
 import os
 import time
 from tornado import ioloop
+from tornado.locks import Event
+import tornado.gen
 
-from consul import tornado, base
-from vergilius import consul, logger, certificate_provider, config
-
+import consul
+from consul.tornado import Consul as TornadoConsul
+from vergilius import Vergilius, logger, config
 
 class Certificate(object):
-    tc = tornado.Consul(host=config.CONSUL_HOST)
+    tc = TornadoConsul(host=config.CONSUL_HOST)
+    cc = consul.Consul(host=config.CONSUL_HOST)
+    ready_event = Event()
 
     def __init__(self, service, domains):
         """
@@ -30,24 +34,24 @@ class Certificate(object):
             os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'))
 
         ioloop.IOLoop.instance().add_callback(self.unlock)
-        self.fetch()
-        self.watch()
+        ioloop.IOLoop.instance().spawn_callback(self.watch)
 
-    def fetch(self):
-        index, data = consul.kv.get('vergilius/certificates/%s/' % self.service.id, recurse=True)
-        self.load_keys_from_consul(data)
+    @tornado.gen.coroutine
+    def fetch(self, index):
+        index, data = yield self.tc.kv.get('vergilius/certificates/%s/' % self.service.id, index=index, recurse=True)
+        return (index, data)
 
     @tornado.gen.coroutine
     def watch(self):
         index = None
         while True and self.active:
             try:
-                index, data = \
-                    yield self.tc.kv.get('vergilius/certificates/%s/' % self.service.id, index=index, recurse=True)
-                self.load_keys_from_consul(data)
-            except base.Timeout:
+                index, data = yield self.fetch(index)
+                yield self.load_keys_from_consul(data)
+            except consul.base.Timeout:
                 pass
 
+    @tornado.gen.coroutine
     def load_keys_from_consul(self, data=None):
         if data:
             for item in data:
@@ -58,23 +62,24 @@ class Certificate(object):
             if not self.validate():
                 logger.warn('[certificate][%s]: cant validate existing keys' % self.service.id)
                 self.discard_certificate()
-                if not self.request_certificate():
+                if not (yield self.request_certificate()):
                     return False
             else:
                 logger.debug('[certificate][%s]: using existing keys' % self.service.id)
         else:
-            if not self.request_certificate():
+            if not (yield self.request_certificate()):
                 return False
 
         self.write_certificate_files()
+        self.ready_event.set()
         return True
 
     def write_certificate_files(self):
-        key_file = open(self.get_key_path(), 'w+')
+        key_file = open(self.get_key_path(), 'wb')
         key_file.write(self.private_key)
         key_file.close()
 
-        pem_file = open(self.get_cert_path(), 'w+')
+        pem_file = open(self.get_cert_path(), 'wb')
         pem_file.write(self.public_key)
         pem_file.close()
 
@@ -90,45 +95,43 @@ class Certificate(object):
     def get_cert_path(self):
         return os.path.join(config.NGINX_CONFIG_PATH, 'certs', self.service.id + '.pem')
 
-    def lock(self):
+    def acquire_lock(self):
         """
         Create a lock in consul to prevent certificate request race condition
         """
-        self.lock_session_id = consul.session.create(behavior='delete')
-        return consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
+        self.lock_session_id = self.cc.session.create(behavior='delete',ttl=10)
+        return self.cc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
 
     def unlock(self):
         if not self.lock_session_id:
             return
 
-        consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
-        consul.session.destroy(self.lock_session_id)
+        self.cc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
+        self.cc.session.destroy(self.lock_session_id)
         self.lock_session_id = None
 
+    @tornado.gen.coroutine
     def request_certificate(self):
         logger.debug('[certificate][%s] Requesting new keys for %s ' % (self.service.name, self.domains))
 
-        if not self.lock():
+        if not self.acquire_lock():
             logger.debug('[certificate][%s] failed to acquire lock for keys generation' % self.service.name)
             return False
 
         try:
-            data = certificate_provider.get_certificate(self.service.id, self.domains)
+            data = yield Vergilius.instance().certificate_provider.get_certificate(self.service.id, self.domains)
 
-            with open(data['private_key'], 'r') as f:
-                self.private_key = f.read()
-                f.close()
-                consul.kv.put('vergilius/certificates/%s/private_key' % self.service.id, self.private_key)
+            self.private_key = data['private_key']
+            self.cc.kv.put('vergilius/certificates/%s/private_key' % self.service.id, self.private_key)
 
-            with open(data['public_key'], 'r') as f:
-                self.public_key = f.read()
-                f.close()
-                consul.kv.put('vergilius/certificates/%s/public_key' % self.service.id, self.public_key)
+            self.public_key = data['public_key']
+            self.cc.kv.put('vergilius/certificates/%s/public_key' % self.service.id, self.public_key)
 
             self.expires = data['expires']
             self.key_domains = self.serialize_domains()
-            consul.kv.put('vergilius/certificates/%s/expires' % self.service.id, str(self.expires))
-            consul.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
+            logger.debug('write domain %s' % self.key_domains)
+            self.cc.kv.put('vergilius/certificates/%s/expires' % self.service.id, str(self.expires))
+            self.cc.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
             logger.info('[certificate][%s]: got new keys for %s ' % (self.service.name, self.domains))
             self.write_certificate_files()
         except Exception as e:
@@ -138,7 +141,7 @@ class Certificate(object):
             self.unlock()
 
     def serialize_domains(self):
-        return '|'.join(sorted(self.domains))
+        return '|'.join(sorted(self.domains)).encode()
 
     def discard_certificate(self):
         pass

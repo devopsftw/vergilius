@@ -1,12 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import logging
 import signal
 
 import time
 import tornado
 
-import vergilius
-from vergilius import logger
+from vergilius import logger, Vergilius
 from vergilius.loop.nginx_reloader import NginxReloader
 from vergilius.loop.service_watcher import ServiceWatcher
 
@@ -41,15 +40,15 @@ def sig_handler(sig, frame):
 
 
 def main():
+    io_loop = tornado.ioloop.IOLoop.current();
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
 
-    vergilius.Vergilius.init()
+    v = Vergilius()
 
     consul_handler = ServiceWatcher()
     nginx_reloader = NginxReloader()
-
-    tornado.ioloop.IOLoop.current().start()
+    io_loop.start()
 
 
 if __name__ == '__main__':

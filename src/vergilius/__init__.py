@@ -5,13 +5,14 @@ from consul import Consul
 from consul import tornado as consul_from_tornado
 from tornado import template
 
-import config
-from components.dummy_certificate_provider import DummyCertificateProvider
+import vergilius.config
+from .components.dummy_certificate_provider import DummyCertificateProvider
+from .components.acme_certificate_provider import AcmeCertificateProvider
 from vergilius.models.identity import Identity
+from vergilius.session import ConsulSession
 
 logger = logging.getLogger(__name__)
 template_loader = template.Loader(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'))
-certificate_provider = DummyCertificateProvider()
 
 consul = Consul(host=config.CONSUL_HOST)
 consul_tornado = consul_from_tornado.Consul(host=config.CONSUL_HOST)
@@ -20,6 +21,18 @@ consul_tornado = consul_from_tornado.Consul(host=config.CONSUL_HOST)
 class Vergilius(object):
     identity = None
 
-    @classmethod
-    def init(cls):
-        cls.identity = Identity()
+    __instance = None
+
+    def __new__(cls):
+        if Vergilius.__instance is None:
+            Vergilius.__instance = object.__new__(cls)
+            Vergilius.__instance.init()
+        return Vergilius.__instance
+
+    def instance():
+        return Vergilius.__instance
+
+    def init(self):
+        self.session = ConsulSession()
+        self.identity = Identity()
+        self.certificate_provider = AcmeCertificateProvider(session=self.session)
