@@ -1,10 +1,11 @@
 import os
 import time
-from tornado import ioloop
+from tornado.ioloop import IOLoop
 from tornado.locks import Event
 import tornado.gen
 
 import consul
+from consul import ConsulException
 from consul.tornado import Consul as TornadoConsul
 from vergilius import Vergilius, logger, config
 
@@ -33,8 +34,8 @@ class Certificate(object):
         if not os.path.exists(os.path.join(config.NGINX_CONFIG_PATH, 'certs')):
             os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'))
 
-        ioloop.IOLoop.instance().add_callback(self.unlock)
-        ioloop.IOLoop.instance().spawn_callback(self.watch)
+        IOLoop.instance().add_callback(self.unlock)
+        IOLoop.instance().spawn_callback(self.watch)
 
     @tornado.gen.coroutine
     def fetch(self, index):
@@ -48,6 +49,9 @@ class Certificate(object):
             try:
                 index, data = yield self.fetch(index)
                 yield self.load_keys_from_consul(data)
+            except ConsulException as e:
+                logger.error('consul error: %s' % e)
+                yield tornado.gen.sleep(5)
             except consul.base.Timeout:
                 pass
 

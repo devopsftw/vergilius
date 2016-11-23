@@ -1,8 +1,8 @@
-import vergilius
-
+import tornado.gen
 from tornado.ioloop import IOLoop
-from consul import tornado, base
+from consul import base, ConsulException
 from vergilius.models.service import Service
+from vergilius import consul_tornado, logger
 
 class ServiceWatcher(object):
     def __init__(self):
@@ -17,8 +17,11 @@ class ServiceWatcher(object):
         index = None
         while True:
             try:
-                index, data = yield vergilius.consul_tornado.catalog.services(index, wait=None)
+                index, data = yield consul_tornado.catalog.services(index, wait=None)
                 self.check_services(data)
+            except ConsulException as e:
+                logger.error('consul error: %s' % e)
+                yield tornado.gen.sleep(5)
             except base.Timeout:
                 pass
 
@@ -27,11 +30,11 @@ class ServiceWatcher(object):
         services_to_publish = dict((k, v) for k, v in data.items() if any(x in v for x in [u'http', u'http2']))
         for service_name in services_to_publish:
             if service_name not in self.services:
-                vergilius.logger.info('[service watcher]: new service: %s' % service_name)
+                logger.info('[service watcher]: new service: %s' % service_name)
                 self.services[service_name] = Service(service_name)
 
         # cleanup stale services
         for service_name in self.services.keys():
             if service_name not in services_to_publish.keys():
-                vergilius.logger.info('[service watcher]: removing stale service: %s' % service_name)
+                logger.info('[service watcher]: removing stale service: %s' % service_name)
                 del self.services[service_name]
