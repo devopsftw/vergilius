@@ -7,8 +7,8 @@ import unicodedata
 import tornado.gen
 from tornado.ioloop import IOLoop
 
-import consul.base
 from consul import ConsulException
+from consul.base import Timeout as ConsulTimeout
 from vergilius import config, consul_tornado, consul, logger, template_loader
 from vergilius.loop.nginx_reloader import NginxReloader
 from vergilius.models.certificate import Certificate
@@ -52,7 +52,7 @@ class Service(object):
             except ConsulException as e:
                 logger.error('consul error: %s' % e)
                 yield tornado.gen.sleep(5)
-            except consul.base.Timeout:
+            except ConsulTimeout:
                 pass
 
     @tornado.gen.coroutine

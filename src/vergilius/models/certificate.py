@@ -4,14 +4,14 @@ from tornado.ioloop import IOLoop
 from tornado.locks import Event
 import tornado.gen
 
-import consul
-from consul import ConsulException
+from consul import Consul, ConsulException
+from consul.base import Timeout as ConsulTimeout
 from consul.tornado import Consul as TornadoConsul
 from vergilius import Vergilius, logger, config
 
 class Certificate(object):
     tc = TornadoConsul(host=config.CONSUL_HOST)
-    cc = consul.Consul(host=config.CONSUL_HOST)
+    cc = Consul(host=config.CONSUL_HOST)
     ready_event = Event()
 
     def __init__(self, service, domains):
@@ -52,7 +52,7 @@ class Certificate(object):
             except ConsulException as e:
                 logger.error('consul error: %s' % e)
                 yield tornado.gen.sleep(5)
-            except consul.base.Timeout:
+            except ConsulTimeout:
                 pass
 
     @tornado.gen.coroutine

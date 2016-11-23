@@ -1,6 +1,9 @@
 import tornado.gen
 from tornado.ioloop import IOLoop
-from consul import base, ConsulException
+
+from consul import ConsulException
+from consul.base import Timeout as ConsulTimeout
+
 from vergilius.models.service import Service
 from vergilius import consul_tornado, logger
 
@@ -22,7 +25,7 @@ class ServiceWatcher(object):
             except ConsulException as e:
                 logger.error('consul error: %s' % e)
                 yield tornado.gen.sleep(5)
-            except base.Timeout:
+            except ConsulTimeout:
                 pass
 
     def check_services(self, data):
