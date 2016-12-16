@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import unicodedata
 
-from consul import tornado, base
+from consul import tornado, base, ConsulException
 from vergilius import config, consul_tornado, consul, logger, template_loader
 from vergilius.loop.nginx_reloader import NginxReloader
 from vergilius.models.certificate import Certificate
@@ -45,6 +45,8 @@ class Service(object):
             try:
                 index, data = yield consul_tornado.health.service(self.name, index, wait=None, passing=True)
                 self.parse_data(data)
+            except ConsulException as e:
+                logger.error('consul exception: %s' % e)
             except base.Timeout:
                 pass
 

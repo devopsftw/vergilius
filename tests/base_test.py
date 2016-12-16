@@ -28,7 +28,9 @@ class BaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseTest, cls).setUpClass()
-        cls.watcher = ServiceWatcher().watch_services()
+        cls.watcher = ServiceWatcher()
+        cls.watcher.watch_services()
+
         threading.Thread(target=start_tornado).start()
 
     @classmethod
