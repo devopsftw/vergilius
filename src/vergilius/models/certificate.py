@@ -1,13 +1,20 @@
 import os
 import time
+from datetime import datetime
+
 from tornado.ioloop import IOLoop
 from tornado.locks import Event
 import tornado.gen
+
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 from consul import Consul, ConsulException
 from consul.base import Timeout as ConsulTimeout
 from consul.tornado import Consul as TornadoConsul
 from vergilius import Vergilius, logger, config
+
 
 class Certificate(object):
     tc = TornadoConsul(host=config.CONSUL_HOST)
@@ -151,17 +158,25 @@ class Certificate(object):
         pass
 
     def validate(self):
-        if int(self.expires) < int(time.time()):
+        if not len(self.private_key) or not len(self.public_key):
+            logger.warn('[certificate][%s]: validation error: empty key' % self.service.id)
+            return False
+
+        try:
+            serialization.load_pem_private_key(self.private_key, password=None, backend=default_backend())
+        except:
+            logger.warn('[certificate][%s]: private key load error: expired' % self.service.id)
+            return False
+
+        cert = x509.load_pem_x509_certificate(self.public_key, default_backend()) # type: x509.Certificate
+        if datetime.now() > cert.not_valid_after:
             logger.warn('[certificate][%s]: validation error: expired' % self.service.id)
             return False
 
+        # TODO: get domain names from cert
         if self.key_domains != self.serialize_domains():
             logger.warn('[certificate][%s]: validation error: domains mismatch: %s != %s' %
                         (self.service.id, self.key_domains, self.serialize_domains()))
-            return False
-
-        if not len(self.private_key) or not len(self.public_key):
-            logger.warn('[certificate][%s]: validation error: empty key' % self.service.id)
             return False
 
         return True
