@@ -1,8 +1,9 @@
-import os, sys, base64, time, logging
+import base64
+import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 
-import tornado.web, tornado.gen
+import tornado.gen
+import tornado.web
 from tornado.httpclient import HTTPClient
 from vergilius import config
 from consul.tornado import Consul as TornadoConsul
@@ -24,10 +25,13 @@ thread_pool = ThreadPoolExecutor(4)
 
 DIRECTORY_URL = 'https://acme-staging.api.letsencrypt.org/directory'
 
+
 class AcmeCertificateProvider(object):
     tc = TornadoConsul(host=config.CONSUL_HOST)
     cc = Consul(host=config.CONSUL_HOST)
     private_key = None
+    _acme = None
+    acme_key = None
 
     def __init__(self, *, session):
         self.session = session
@@ -43,8 +47,9 @@ class AcmeCertificateProvider(object):
 
     def fetch_key(self):
         index, key_data = self.cc.kv.get('vergilius/acme/private_key')
-        if (key_data):
-            self.private_key = serialization.load_pem_private_key(key_data['Value'],password=None,backend=default_backend())
+        if key_data:
+            self.private_key = serialization.load_pem_private_key(key_data['Value'],
+                                                                  password=None, backend=default_backend())
         else:
             self.private_key = rsa.generate_private_key(
                     public_exponent=65537,
@@ -63,8 +68,9 @@ class AcmeCertificateProvider(object):
         self._acme = client.Client(DIRECTORY_URL, self.acme_key)
         try:
             regr = self._acme.register()
-            acme.agree_to_tos(self._regr)
-        except:
+            self._acme.agree_to_tos(regr)
+        except Exception as e:
+            logger.error('acme certificate provider error: %s' % e)
             pass
 
     def get_for_domain(self, domain):
@@ -74,7 +80,6 @@ class AcmeCertificateProvider(object):
 
         # get token
         def _parse_token(authzr):
-            token = None
             for c in authzr.body.challenges:
                 json = c.chall.to_partial_json()
                 if json['type'] == 'http-01':
@@ -83,7 +88,7 @@ class AcmeCertificateProvider(object):
         def _store_token(token):
             # put token to consul KV
             thumbprint = _b64(self.acme_key.thumbprint())
-            keyauth = '{0}.{1}'.format(token,thumbprint)
+            keyauth = '{0}.{1}'.format(token, thumbprint)
             self.cc.kv.put('vergilius/acme/challenge/%s' % token, keyauth)
 
         # request challenges for domain
@@ -91,15 +96,15 @@ class AcmeCertificateProvider(object):
         token = _parse_token(authzr)
         _store_token(token)
 
-        challenge = [ x for x in authzr.body.challenges if x.typ == 'http-01' ][0]
+        challenge = [x for x in authzr.body.challenges if x.typ == 'http-01'][0]
         response, validation = challenge.response_and_validation(self.acme_key)
         print('chall uri', challenge.uri)
 
         result = self._acme.answer_challenge(challenge, response)
         print('answer result is ', result)
 
-        waitUntil = time.time() + 30
-        while time.time() < waitUntil:
+        wait_until = time.time() + 30
+        while time.time() < wait_until:
             logger.debug('polling...')
             authzr, authzr_response = self._acme.poll(authzr)
             if authzr.body.status not in (
@@ -111,38 +116,41 @@ class AcmeCertificateProvider(object):
         return authzr
 
     def get_csr(self, domains):
+        """create certificate request for domains"""
         private_key = rsa.generate_private_key(
                 public_exponent=65537,
                 key_size=2048,
                 backend=default_backend()
         )
-        firstDomain = domains[0]
+        first_domain = domains[0]
         csr = x509.CertificateSigningRequestBuilder().subject_name(
             x509.Name([
                 x509.NameAttribute(NameOID.COUNTRY_NAME, 'RU'),
                 x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, 'Yekaterinburg'),
                 x509.NameAttribute(NameOID.LOCALITY_NAME, 'Yekaterinburg'),
                 x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'devopsftw'),
-                x509.NameAttribute(NameOID.COMMON_NAME, firstDomain),
+                x509.NameAttribute(NameOID.COMMON_NAME, first_domain),
             ])
         ).add_extension(
             x509.SubjectAlternativeName([
                 x509.DNSName(domain) for domain in domains
             ]),
-            critical = False,
+            critical=False,
         ).sign(private_key, hashes.SHA256(), default_backend())
 
         csr_openssl = OpenSSL.crypto.load_certificate_request(
             OpenSSL.crypto.FILETYPE_PEM,
             csr.public_bytes(serialization.Encoding.PEM)
         )
-        return (private_key, csr_openssl)
+        return private_key, csr_openssl
 
     def get_authzrs(self, domains):
-        authzrs = [ self.get_for_domain(domain) for domain in domains ]
+        """request challenges for each domain"""
+        authzrs = [self.get_for_domain(domain) for domain in domains]
         return authzrs
 
-    def request_certificate(self, csr, domains, authzrs):
+    def request_certificate(self, csr, authzrs):
+        """request certificates for solved challenges"""
         try:
             response = self._acme.request_issuance(jose.util.ComparableX509(csr), authzrs)
             cert_data = HTTPClient().fetch(response.uri).body
@@ -156,11 +164,13 @@ class AcmeCertificateProvider(object):
     def query_letsencrypt(self, domains):
         authzrs = self.get_authzrs(domains)
         domain_key, csr = self.get_csr(domains)
-        cert = self.request_certificate(csr, domains, authzrs)
-        return (domain_key, cert)
+        cert = self.request_certificate(csr, authzrs)
+        return domain_key, cert
 
     @tornado.gen.coroutine
     def get_certificate(self, id, domains):
+        """Get certificate for requested domains"""
+
         logger.debug('get cert for domains %s' % domains)
         sid = yield self.session.get_sid()
         logger.debug('sid is %s' % sid)
@@ -177,11 +187,12 @@ class AcmeCertificateProvider(object):
         result = {
             'private_key': key_str,
             'public_key': cert_str,
-            'expires' : expires
+            'expires': expires
 
         }
         logger.debug('cert result is', result)
         return result
+
 
 class AcmeChallengeHandler(tornado.web.RequestHandler):
     tc = TornadoConsul(host=config.CONSUL_HOST)

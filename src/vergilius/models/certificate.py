@@ -40,7 +40,7 @@ class Certificate(object):
     @tornado.gen.coroutine
     def fetch(self, index):
         index, data = yield self.tc.kv.get('vergilius/certificates/%s/' % self.service.id, index=index, recurse=True)
-        return (index, data)
+        return index, data
 
     @tornado.gen.coroutine
     def watch(self):
@@ -49,11 +49,11 @@ class Certificate(object):
             try:
                 index, data = yield self.fetch(index)
                 yield self.load_keys_from_consul(data)
+            except ConsulTimeout:
+                pass
             except ConsulException as e:
                 logger.error('consul error: %s' % e)
                 yield tornado.gen.sleep(5)
-            except ConsulTimeout:
-                pass
 
     @tornado.gen.coroutine
     def load_keys_from_consul(self, data=None):
@@ -103,7 +103,7 @@ class Certificate(object):
         """
         Create a lock in consul to prevent certificate request race condition
         """
-        self.lock_session_id = self.cc.session.create(behavior='delete',ttl=10)
+        self.lock_session_id = self.cc.session.create(behavior='delete', ttl=10)
         return self.cc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
 
     def unlock(self):

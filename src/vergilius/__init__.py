@@ -21,6 +21,10 @@ consul_tornado = consul_from_tornado.Consul(host=config.CONSUL_HOST)
 class Vergilius(object):
     identity = None
 
+    session = None
+
+    certificate_provider = None
+
     __instance = None
 
     def __new__(cls):

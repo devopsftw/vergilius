@@ -2,13 +2,16 @@ import logging
 
 from vergilius import config
 
-import consul, tornado
+import consul
+import tornado
 from consul.tornado import Consul as TornadoConsul
 from tornado.ioloop import IOLoop
 from tornado.locks import Event
+import tornado.gen
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 
 class ConsulSession(object):
     tc = TornadoConsul(host=config.CONSUL_HOST)
@@ -29,7 +32,7 @@ class ConsulSession(object):
 
     @tornado.gen.coroutine
     def ensure_session(self):
-        if self._sid == None:
+        if self._sid is None:
             self._sid = yield self.create_session()
             self._waitSid.set()
         else:

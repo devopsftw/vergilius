@@ -22,11 +22,11 @@ class ServiceWatcher(object):
             try:
                 index, data = yield consul_tornado.catalog.services(index, wait=None)
                 self.check_services(data)
+            except ConsulTimeout:
+                pass
             except ConsulException as e:
                 logger.error('consul error: %s' % e)
                 yield tornado.gen.sleep(5)
-            except ConsulTimeout:
-                pass
 
     def check_services(self, data):
         # check if service has any of our tags
