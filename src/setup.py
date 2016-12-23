@@ -2,8 +2,8 @@ from setuptools import setup
 from setuptools import find_packages
 
 install_requires = [
-    'python-consul',
-    'tornado',
+    'python-consul==0.7.0',
+    'tornado==4.4.2',
     'setuptools>=1.0',
     'zope.component',
     'zope.interface',
