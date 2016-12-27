@@ -3,7 +3,7 @@ import logging
 import signal
 
 import time
-import tornado
+import tornado.ioloop
 
 from vergilius import logger, Vergilius
 from vergilius.loop.nginx_reloader import NginxReloader
@@ -44,7 +44,6 @@ def handle_future(f):
         raise f.exception()
 
 def main():
-    io_loop = tornado.ioloop.IOLoop.current();
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
 
