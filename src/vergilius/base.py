@@ -1,10 +1,8 @@
 import logging
-
-from vergilius import config
-
 import consul
-import tornado
-from consul.tornado import Consul as TornadoConsul
+
+from vergilius import consul_tornado
+
 from tornado.ioloop import IOLoop
 from tornado.locks import Event
 import tornado.gen
@@ -14,8 +12,6 @@ logger.setLevel(logging.DEBUG)
 
 
 class ConsulSession(object):
-    tc = TornadoConsul(host=config.CONSUL_HOST)
-    cc = consul.Consul(host=config.CONSUL_HOST)
     _sid = None
 
     def __init__(self):
@@ -37,15 +33,17 @@ class ConsulSession(object):
             self._waitSid.set()
         else:
             try:
-                yield self.tc.session.renew(self._sid)
+                yield consul_tornado.session.renew(self._sid)
             except consul.NotFound:
                 logger.error('session not found, trying to recreate')
                 self._sid = yield self.create_session()
+            except consul.ConsulException as e:
+                logger.error('consul exception: %s' % e)
         return True
 
     @tornado.gen.coroutine
     def create_session(self):
-        sid = yield self.tc.session.create('vergilius', ttl=10, behavior='delete', lock_delay=0)
+        sid = yield consul_tornado.session.create('vergilius', ttl=10, behavior='delete', lock_delay=0)
         logger.debug('session created: %s', sid)
         return sid
 
@@ -53,3 +51,4 @@ class ConsulSession(object):
     def get_sid(self):
         yield self._waitSid.wait()
         return self._sid
+

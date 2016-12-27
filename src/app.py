@@ -5,9 +5,8 @@ import signal
 import time
 import tornado.ioloop
 
-from vergilius import logger, Vergilius
-from vergilius.loop.nginx_reloader import NginxReloader
-from vergilius.loop.service_watcher import ServiceWatcher
+from vergilius import logger
+from vergilius.loop import NginxReloader, ServiceWatcher
 
 MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 10
 
@@ -38,16 +37,17 @@ def sig_handler(sig, frame):
     logger.warning('Caught signal: %s', sig)
     tornado.ioloop.IOLoop.instance().add_callback(shutdown)
 
+
 def handle_future(f):
     tornado.ioloop.IOLoop.current().stop()
-    if f.exception() != None:
+    if f.exception() is not None:
         raise f.exception()
+
 
 def main():
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
 
-    Vergilius().instance()
     consul_handler = ServiceWatcher().watch_services()
     nginx_reloader = NginxReloader().nginx_reload()
 
