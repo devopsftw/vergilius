@@ -7,6 +7,7 @@ from consul.base import Timeout as ConsulTimeout
 from vergilius.models.service import Service
 from vergilius import consul_tornado, logger
 
+
 class ServiceWatcher(object):
     def __init__(self):
         self.services = {}

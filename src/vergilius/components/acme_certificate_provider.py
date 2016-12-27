@@ -29,7 +29,6 @@ DIRECTORY_URL = 'https://acme-staging.api.letsencrypt.org/directory'
 class AcmeCertificateProvider(object):
     tc = TornadoConsul(host=config.CONSUL_HOST)
     cc = Consul(host=config.CONSUL_HOST)
-    private_key = None
     _acme = None
     acme_key = None
 
@@ -48,21 +47,21 @@ class AcmeCertificateProvider(object):
     def fetch_key(self):
         index, key_data = self.cc.kv.get('vergilius/acme/private_key')
         if key_data:
-            self.private_key = serialization.load_pem_private_key(key_data['Value'],
-                                                                  password=None, backend=default_backend())
+            private_key = serialization.load_pem_private_key(key_data['Value'],
+                                                             password=None, backend=default_backend())
         else:
-            self.private_key = rsa.generate_private_key(
+            private_key = rsa.generate_private_key(
                     public_exponent=65537,
                     key_size=2048,
                     backend=default_backend()
             )
-            key_data = self.private_key.private_bytes(
+            key_data = private_key.private_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PrivateFormat.TraditionalOpenSSL,
                     encryption_algorithm=serialization.NoEncryption()
             )
             self.cc.kv.put('vergilius/acme/private_key', key_data)
-        self.acme_key = jose.JWKRSA(key=self.private_key)
+        self.acme_key = jose.JWKRSA(key=private_key)
 
     def init_acme(self):
         self._acme = client.Client(DIRECTORY_URL, self.acme_key)
@@ -74,7 +73,6 @@ class AcmeCertificateProvider(object):
             pass
 
     def get_for_domain(self, domain):
-
         def _b64(b):
             return base64.urlsafe_b64encode(b).decode('utf8').replace("=", "")
 
@@ -107,8 +105,7 @@ class AcmeCertificateProvider(object):
         while time.time() < wait_until:
             logger.debug('polling...')
             authzr, authzr_response = self._acme.poll(authzr)
-            if authzr.body.status not in (
-                    messages.STATUS_VALID, messages.STATUS_INVALID):
+            if authzr.body.status not in (messages.STATUS_VALID, messages.STATUS_INVALID):
                 time.sleep(2)
             else:
                 break
@@ -157,8 +154,8 @@ class AcmeCertificateProvider(object):
             cert = x509.load_der_x509_certificate(cert_data, default_backend())
             return cert
         except messages.Error as error:
-            print ("This script is doomed to fail as no authorization "
-                   "challenges are ever solved. Error from server: {0}".format(error))
+            print("This script is doomed to fail as no authorization "
+                  "challenges are ever solved. Error from server: {0}".format(error))
         return None
 
     def query_letsencrypt(self, domains):
@@ -172,15 +169,13 @@ class AcmeCertificateProvider(object):
         """Get certificate for requested domains"""
 
         logger.debug('get cert for domains %s' % domains)
-        sid = yield self.session.get_sid()
-        logger.debug('sid is %s' % sid)
 
         domain_key, cert = yield thread_pool.submit(self.query_letsencrypt, domains)
 
         key_str = domain_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
         )
         cert_str = cert.public_bytes(serialization.Encoding.PEM)
         expires = int(cert.not_valid_after.timestamp())
@@ -190,7 +185,6 @@ class AcmeCertificateProvider(object):
             'expires': expires
 
         }
-        logger.debug('cert result is', result)
         return result
 
 

@@ -6,8 +6,8 @@ from consul import tornado as consul_from_tornado
 from tornado import template
 
 import vergilius.config
-from .components.dummy_certificate_provider import DummyCertificateProvider
-from .components.acme_certificate_provider import AcmeCertificateProvider
+from vergilius.components.dummy_certificate_provider import DummyCertificateProvider
+from vergilius.components.acme_certificate_provider import AcmeCertificateProvider
 from vergilius.models.identity import Identity
 from vergilius.session import ConsulSession
 
@@ -33,8 +33,9 @@ class Vergilius(object):
             Vergilius.__instance.init()
         return Vergilius.__instance
 
-    def instance():
-        return Vergilius.__instance
+    @classmethod
+    def instance(cls):
+        return cls.__instance
 
     def init(self):
         self.session = ConsulSession()
