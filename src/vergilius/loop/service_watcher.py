@@ -14,7 +14,6 @@ class ServiceWatcher(object):
 
         self.data = {}
         self.modified = False
-        IOLoop.instance().spawn_callback(self.watch_services)
 
     @tornado.gen.coroutine
     def watch_services(self):

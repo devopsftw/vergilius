@@ -11,7 +11,7 @@ class NginxReloader(object):
     nginx_update_event = Event()
 
     def __init__(self):
-        IOLoop.instance().spawn_callback(self.nginx_reload)
+        pass
 
     @classmethod
     @tornado.gen.coroutine

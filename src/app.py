@@ -38,16 +38,24 @@ def sig_handler(sig, frame):
     logger.warning('Caught signal: %s', sig)
     tornado.ioloop.IOLoop.instance().add_callback(shutdown)
 
+def handle_future(f):
+    tornado.ioloop.IOLoop.current().stop()
+    if f.exception() != None:
+        raise f.exception()
 
 def main():
     io_loop = tornado.ioloop.IOLoop.current();
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
 
-    v = Vergilius()
+    Vergilius().instance()
+    consul_handler = ServiceWatcher().watch_services()
+    nginx_reloader = NginxReloader().nginx_reload()
 
-    consul_handler = ServiceWatcher()
-    nginx_reloader = NginxReloader()
+    io_loop = tornado.ioloop.IOLoop.current()
+    io_loop.add_future(consul_handler, handle_future)
+    io_loop.add_future(nginx_reloader, handle_future)
+
     io_loop.start()
 
 
