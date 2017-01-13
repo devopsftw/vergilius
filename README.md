@@ -37,9 +37,15 @@ Consul service config example
 }
 ```
 
-Vergilius looks for registered services with tags `http` and `http2`, creates upstream with all containers of this service,
+Vergilius looks for registered services with tags `http` and `http2` creates upstream with all containers of this service,
 routes requests from `(www.)?service.example.com` and `*.(www.)?service.example.com` to containers using nginx
 `least_conn` balancing algorithm.
+
+You can also add `tcp` and `udp` tags to service, vergilus will stream this protocols too.
+ External ports for this services are stored in consul KV at `vergilius/ports/%service_name%`.
+ You can configure external ports range with `PROXY_PORTS` env, for ex.: `5000-6000`. 
+ It's strongly recommended to use vergilius in `net=host` mode, because docker will create as much 
+   userland proxies as `PROXY_PORTS` you have.
 
 #### how http2 works
 
