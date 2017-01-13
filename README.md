@@ -44,8 +44,8 @@ routes requests from `(www.)?service.example.com` and `*.(www.)?service.example.
 You can also add `tcp` and `udp` tags to service, vergilus will stream this protocols too.
  External ports for this services are stored in consul KV at `vergilius/ports/%service_name%`.
  You can configure external ports range with `PROXY_PORTS` env, for ex.: `5000-6000`. 
- It's strongly recommended to use vergilius in `net=host` mode, because docker will create as much 
-   userland proxies as `PROXY_PORTS` you have.
+ It's strongly recommended to use vergilius in `net=host` mode or disable `userland-proxy`,
+  because docker will create as much userland proxies as `PROXY_PORTS` you have.
 
 #### how http2 works
 
