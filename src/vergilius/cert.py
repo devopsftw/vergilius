@@ -32,8 +32,7 @@ class AcmeCertificateProvider(object):
     _acme = None
     acme_key = None
 
-    def __init__(self, *, session):
-        self.session = session
+    def __init__(self):
         self.app = self.make_app()
         self.app.listen(8888)
         self.fetch_key()
@@ -165,12 +164,15 @@ class AcmeCertificateProvider(object):
         return domain_key, cert
 
     @tornado.gen.coroutine
-    def get_certificate(self, id, domains):
+    def get_certificate(self, domains):
         """Get certificate for requested domains"""
 
         logger.debug('get cert for domains %s' % domains)
 
         domain_key, cert = yield thread_pool.submit(self.query_letsencrypt, domains)
+
+        if cert is None:
+            return None
 
         key_str = domain_key.private_bytes(
             encoding=serialization.Encoding.PEM,

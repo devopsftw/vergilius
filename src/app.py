@@ -1,15 +1,16 @@
 #!/usr/bin/python3
 import logging
 import signal
-
 import time
-import tornado.ioloop
 
-from vergilius import logger
+import tornado.ioloop
+import vergilius.base
+from vergilius.cert import AcmeCertificateProvider
 from vergilius.loop import NginxReloader, ServiceWatcher
 
 MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 10
 
+logger = logging.getLogger('vergilius')
 logger.setLevel(logging.DEBUG)
 
 
@@ -48,15 +49,21 @@ def main():
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
 
-    consul_handler = ServiceWatcher().watch_services()
-    nginx_reloader = NginxReloader().nginx_reload()
+    app = App()
+    sw = ServiceWatcher(app)
 
     io_loop = tornado.ioloop.IOLoop.current()
-    io_loop.add_future(consul_handler, handle_future)
-    io_loop.add_future(nginx_reloader, handle_future)
+    io_loop.add_future(sw.watch_services(), handle_future)
+    io_loop.add_future(app.nginx_reloader.reload(), handle_future)
 
     io_loop.start()
 
+
+class App(object):
+    def __init__(self):
+        self.session = vergilius.base.ConsulSession()
+        self.certificate_provider = AcmeCertificateProvider()
+        self.nginx_reloader = NginxReloader()
 
 if __name__ == '__main__':
     main()

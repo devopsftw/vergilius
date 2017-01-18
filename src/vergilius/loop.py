@@ -1,14 +1,18 @@
+import logging
 import subprocess
 
-import vergilius
-from vergilius.models.service import Service
-from vergilius import consul_tornado, logger
+from consul.tornado import Consul as TornadoConsul
+from consul import ConsulException
+from consul.base import Timeout as ConsulTimeout
+
+from vergilius import config
+from vergilius.models import Service
 
 import tornado.gen
 from tornado.locks import Event
 
-from consul import ConsulException
-from consul.base import Timeout as ConsulTimeout
+logger = logging.getLogger(__name__)
+tc = TornadoConsul(host=config.CONSUL_HOST)
 
 
 class NginxReloader(object):
@@ -19,15 +23,15 @@ class NginxReloader(object):
 
     @classmethod
     @tornado.gen.coroutine
-    def nginx_reload(cls):
+    def reload(cls):
         while True:
             yield cls.nginx_update_event.wait()
             cls.nginx_update_event.clear()
-            vergilius.logger.info('[nginx]: reload')
+            logger.info('nginx reload')
             try:
-                subprocess.check_call([vergilius.config.NGINX_BINARY, '-s', 'reload'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except subprocess.CalledProcessError:
-                logger.error('failed to reload nginx')
+                subprocess.check_call([config.NGINX_BINARY, '-s', 'reload'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except subprocess.CalledProcessError as e:
+                logger.error('nginx reload fail. stderr: %s' % e.stderr)
 
     @classmethod
     def queue_reload(cls):
@@ -35,18 +39,19 @@ class NginxReloader(object):
 
 
 class ServiceWatcher(object):
-    def __init__(self):
+    def __init__(self, app):
         self.services = {}
 
         self.data = {}
         self.modified = False
+        self.app = app
 
     @tornado.gen.coroutine
     def watch_services(self):
         index = None
         while True:
             try:
-                index, data = yield consul_tornado.catalog.services(index, wait=None)
+                index, data = yield tc.catalog.services(index, wait=None)
                 self.check_services(data)
             except ConsulTimeout:
                 pass
@@ -60,7 +65,7 @@ class ServiceWatcher(object):
         for service_name in services_to_publish:
             if service_name not in self.services:
                 logger.info('[service watcher]: new service: %s' % service_name)
-                self.services[service_name] = Service(service_name)
+                self.services[service_name] = Service(service_name, self.app)
 
         # cleanup stale services
         for service_name in self.services.keys():

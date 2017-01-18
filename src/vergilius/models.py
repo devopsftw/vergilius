@@ -1,4 +1,5 @@
 import os
+import logging
 import re
 import subprocess
 import tempfile
@@ -6,6 +7,7 @@ import unicodedata
 from datetime import datetime
 
 import tornado.gen
+import tornado.template
 from tornado.ioloop import IOLoop
 from tornado.locks import Event
 
@@ -13,19 +15,21 @@ from consul import Consul, ConsulException
 from consul.base import Timeout as ConsulTimeout
 from consul.tornado import Consul as TornadoConsul
 
-from vergilius import config, consul as cc, consul_tornado as tc, logger, template_loader
-from vergilius.loop import NginxReloader
-
+from vergilius import config
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
+logger = logging.getLogger(__name__)
+template_loader = tornado.template.Loader(config.TEMPLATE_PATH)
+tc = TornadoConsul(host=config.CONSUL_HOST)
+cc = Consul(host=config.CONSUL_HOST)
 
 class Service(object):
     active = False
 
-    def __init__(self, name):
+    def __init__(self, name, app):
         """
         :type name: unicode - service name got from consul
         """
@@ -41,6 +45,7 @@ class Service(object):
 
         self.active = True
         self.certificate = None
+        self.app = app
 
         if not os.path.exists(config.NGINX_CONFIG_PATH):
             os.mkdir(config.NGINX_CONFIG_PATH)
@@ -57,16 +62,15 @@ class Service(object):
                 yield self.parse_data(data)
                 # okay, got data, now reload
                 yield self.update_config()
+            except ConsulTimeout:
+                pass
             except ConsulException as e:
                 logger.error('consul error: %s' % e)
                 yield tornado.gen.sleep(5)
-            except ConsulTimeout:
-                pass
 
     @tornado.gen.coroutine
     def parse_data(self, data):
         """
-
         :type data: set[]
         """
         for protocol in self.domains.keys():
@@ -76,11 +80,11 @@ class Service(object):
         self.nodes = {}
         for node in data:
             if not node[u'Service'][u'Port']:
-                logger.warn('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
+                logger.warning('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
                 continue
 
             if node[u'Service'][u'Tags'] is None:
-                logger.warn('[service][%s]: Node %s is ignored due no ServiceTags' % (self.id, node[u'Node']))
+                logger.warning('[service][%s]: Node %s is ignored due no ServiceTags' % (self.id, node[u'Node']))
                 continue
 
             self.nodes[node['Node']['Node']] = {
@@ -110,7 +114,8 @@ class Service(object):
             if not self.certificate:
                 logger.debug('[service][%s] flush stub config' % self.id)
                 self.flush_nginx_config(self.get_stub_config())
-                self.certificate = Certificate(service=self, domains=self.domains[u'http2'])
+                self.certificate = Certificate(service=self, domains=self.domains[u'http2'],
+                                               certificate_provider=self.app.certificate_provider)
                 logger.debug('[service][%s] wait for cert' % self.id)
                 yield self.certificate.ready_event.wait()
             logger.debug('[service][%s] load real https config' % self.id)
@@ -145,7 +150,7 @@ class Service(object):
             config_file.write(nginx_config)
             config_file.close()
             logger.info('[service][%s]: got new nginx config %s' % (self.name, self.get_nginx_config_path()))
-            NginxReloader.queue_reload()
+            self.app.nginx_reloader.queue_reload()
 
     def get_nginx_config_path(self):
         return os.path.join(config.NGINX_CONFIG_PATH, self.id + '.conf')
@@ -173,7 +178,11 @@ class Service(object):
         nginx_config_file.close()
 
         try:
-            return_code = subprocess.check_call([config.NGINX_BINARY, '-t', '-c', nginx_config_file.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return_code = subprocess.check_call(
+                [config.NGINX_BINARY, '-t', '-c', nginx_config_file.name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
         except subprocess.CalledProcessError:
             return_code = 1
         finally:
@@ -217,7 +226,7 @@ class Certificate(object):
     cc = Consul(host=config.CONSUL_HOST)
     ready_event = Event()
 
-    def __init__(self, service, domains):
+    def __init__(self, service, domains, certificate_provider=None):
         """
         :type domains: set
         :type service: Service - service name got from consul
@@ -228,11 +237,13 @@ class Certificate(object):
         self.key_domains = ''
         self.id = '|'.join(self.domains)
 
-        self.private_key = None
-        self.public_key = None
+        self.private_key = ''
+        self.public_key = ''
 
         self.active = True
         self.lock_session_id = None
+
+        self.certificate_provider = certificate_provider
 
         if not os.path.exists(os.path.join(config.NGINX_CONFIG_PATH, 'certs')):
             os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'))
@@ -267,7 +278,7 @@ class Certificate(object):
                     setattr(self, key, item['Value'])
 
             if not self.validate():
-                logger.warn('[certificate][%s]: cant validate existing keys' % self.service.id)
+                logger.warning('[certificate][%s]: cant validate existing keys' % self.service.id)
                 self.discard_certificate()
                 if not (yield self.request_certificate()):
                     return False
@@ -326,7 +337,11 @@ class Certificate(object):
             return False
 
         try:
-            data = yield Vergilius.instance().certificate_provider.get_certificate(self.service.id, self.domains)
+            data = yield self.certificate_provider.get_certificate(self.domains)
+
+            if data is None:
+                logger.error('certificate get failed for service %s' % self.service.name)
+                return False
 
             self.private_key = data['private_key']
             cc.kv.put('vergilius/certificates/%s/private_key' % self.service.id, self.private_key)
@@ -355,24 +370,24 @@ class Certificate(object):
 
     def validate(self):
         if not len(self.private_key) or not len(self.public_key):
-            logger.warn('[certificate][%s]: validation error: empty key' % self.service.id)
+            logger.warning('[certificate][%s]: validation error: empty key' % self.service.id)
             return False
 
         try:
             serialization.load_pem_private_key(self.private_key, password=None, backend=default_backend())
         except:
-            logger.warn('[certificate][%s]: private key load error: expired' % self.service.id)
+            logger.warning('[certificate][%s]: private key load error: expired' % self.service.id)
             return False
 
-        cert = x509.load_pem_x509_certificate(self.public_key, default_backend()) # type: x509.Certificate
+        cert = x509.load_pem_x509_certificate(self.public_key, default_backend())  # type: x509.Certificate
         if datetime.now() > cert.not_valid_after:
-            logger.warn('[certificate][%s]: validation error: expired' % self.service.id)
+            logger.warning('[certificate][%s]: validation error: expired' % self.service.id)
             return False
 
         # TODO: get domain names from cert
         if self.key_domains != self.serialize_domains():
-            logger.warn('[certificate][%s]: validation error: domains mismatch: %s != %s' %
-                        (self.service.id, self.key_domains, self.serialize_domains()))
+            logger.warning('[certificate][%s]: validation error: domains mismatch: %s != %s' %
+                           (self.service.id, self.key_domains, self.serialize_domains()))
             return False
 
         return True
