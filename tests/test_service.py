@@ -1,6 +1,6 @@
 
 from base_test import BaseTest
-from vergilius.models import Service
+from vergilius.models import Service, Certificate
 from consul import Consul
 
 cc = Consul()
@@ -39,6 +39,7 @@ class Test(BaseTest):
     def test_http2(self):
         service = Service(name='test service', app=self.app)
         service.domains[u'http2'] = ('example.com',)
+        service.certificate = Certificate(service, service.domains) # FIXME: create tornado-async test and wait for cert
         self.assertTrue(service.validate(service.get_nginx_config()), 'nginx config is valid')
 
     def test_upstream_nodes(self):

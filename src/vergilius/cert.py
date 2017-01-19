@@ -1,4 +1,5 @@
 import base64
+import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
@@ -206,4 +207,37 @@ class AcmeChallengeHandler(tornado.web.RequestHandler):
 class DummyCertificateProvider(object):
     @tornado.gen.coroutine
     def get_certificate(self, domains):
-        return None
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, 'RU'),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, 'Yekaterinburg'),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, 'Yekaterinburg'),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'devopsftw'),
+            x509.NameAttribute(NameOID.COMMON_NAME, domains[0]),
+        ])
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.utcnow()
+        ).not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=10)
+        ).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(domains[0])]),
+            critical=False
+        ).sign(key, hashes.SHA256(), default_backend())
+
+        return {
+            'private_key': key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ),
+            'public_key': cert.public_bytes(serialization.Encoding.PEM),
+            'expires': cert.not_valid_after.timestamp()
+        }
