@@ -26,6 +26,7 @@ template_loader = tornado.template.Loader(config.TEMPLATE_PATH)
 tc = TornadoConsul(host=config.CONSUL_HOST)
 cc = Consul(host=config.CONSUL_HOST)
 
+
 class Service(object):
     active = False
 
@@ -237,8 +238,8 @@ class Certificate(object):
         self.key_domains = ''
         self.id = '|'.join(self.domains)
 
-        self.private_key = ''
-        self.public_key = ''
+        self.private_key = None
+        self.public_key = None
 
         self.active = True
         self.lock_session_id = None
@@ -369,7 +370,7 @@ class Certificate(object):
         pass
 
     def validate(self):
-        if not len(self.private_key) or not len(self.public_key):
+        if not self.private_key or not self.public_key:
             logger.warning('[certificate][%s]: validation error: empty key' % self.service.id)
             return False
 

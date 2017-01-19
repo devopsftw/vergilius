@@ -10,7 +10,8 @@ from vergilius.loop import NginxReloader, ServiceWatcher
 
 MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 10
 
-logger = logging.getLogger('vergilius')
+logging.basicConfig(format='%(asctime)s %(levelname)s:%(name)s %(message)s')
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
@@ -34,7 +35,7 @@ def shutdown():
     stop_loop()
 
 
-def sig_handler(sig, frame):
+def sig_handler(sig):
     logger.warning('Caught signal: %s', sig)
     tornado.ioloop.IOLoop.instance().add_callback(shutdown)
 
