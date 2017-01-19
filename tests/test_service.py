@@ -15,7 +15,7 @@ class Test(BaseTest):
         pass
 
     def test_base(self):
-        service = Service(name='test service')
+        service = Service(name='test service', app=self.app)
         service.flush_nginx_config()
 
         config_file = service.get_nginx_config_path()
@@ -28,7 +28,7 @@ class Test(BaseTest):
             open(config_file, 'r')
 
     def test_http(self):
-        service = Service(name='test service')
+        service = Service(name='test service', app=self.app)
 
         service.domains[u'http'] = ('example.com',)
 
@@ -37,12 +37,12 @@ class Test(BaseTest):
         self.assertTrue(service.validate(), 'nginx config is valid')
 
     def test_http2(self):
-        service = Service(name='test service')
+        service = Service(name='test service', app=self.app)
         service.domains[u'http2'] = ('example.com',)
         self.assertTrue(service.validate(), 'nginx config is valid')
 
     def test_upstream_nodes(self):
-        service = Service(name='test service')
+        service = Service(name='test service', app=self.app)
         service.domains[u'http'] = ('example.com',)
         service.nodes['test_node'] = {'address': '127.0.0.1', 'port': '10000'}
         self.assertTrue(service.validate(), 'nginx config is valid')

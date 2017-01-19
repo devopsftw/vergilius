@@ -35,11 +35,12 @@ class MockApp(object):
         self.certificate_provider = vergilius.cert.DummyCertificateProvider()
         self.nginx_reloader = vergilius.loop.NginxReloader()
 
+
 class BaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseTest, cls).setUpClass()
-        app = MockApp()
+        cls.app = MockApp()
         cls.watcher = vergilius.loop.ServiceWatcher(app)
         cls.watcher.watch_services()
 
@@ -59,8 +60,6 @@ class BaseTest(unittest.TestCase):
             os.mkdir(vergilius.config.NGINX_CONFIG_PATH)
         except OSError as e:
             print(e)
-
-        vergilius.Vergilius.init()
 
     def tearDown(self):
         super(BaseTest, self).tearDown()
