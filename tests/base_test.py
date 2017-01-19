@@ -7,28 +7,40 @@ import sys
 import shutil
 import tornado
 
-import vergilius
-from vergilius import consul, logger
-from vergilius.loop.service_watcher import ServiceWatcher
-from vergilius.models.identity import Identity
+os.environ.setdefault('SECRET', 'test')
+import vergilius.base
+import vergilius.cert
+import vergilius.loop
+
+from consul import Consul
 
 out_hdlr = logging.StreamHandler(sys.stdout)
 out_hdlr.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
 out_hdlr.setLevel(logging.DEBUG)
 
+logger = logging.getLogger('tests')
 logger.addHandler(out_hdlr)
 logger.setLevel(logging.DEBUG)
+
+cc = Consul()
 
 
 def start_tornado():
     tornado.ioloop.IOLoop.instance().start()
 
 
+class MockApp(object):
+    def __init__(self):
+        self.session = vergilius.base.ConsulSession()
+        self.certificate_provider = vergilius.cert.DummyCertificateProvider()
+        self.nginx_reloader = vergilius.loop.NginxReloader()
+
 class BaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(BaseTest, cls).setUpClass()
-        cls.watcher = ServiceWatcher()
+        app = MockApp()
+        cls.watcher = vergilius.loop.ServiceWatcher(app)
         cls.watcher.watch_services()
 
         threading.Thread(target=start_tornado).start()
@@ -40,7 +52,7 @@ class BaseTest(unittest.TestCase):
 
     def setUp(self):
         super(BaseTest, self).setUp()
-        consul.kv.delete('vergilius', True)
+        cc.kv.delete('vergilius', True)
 
         try:
             os.mkdir(vergilius.config.DATA_PATH)
@@ -52,7 +64,7 @@ class BaseTest(unittest.TestCase):
 
     def tearDown(self):
         super(BaseTest, self).tearDown()
-        consul.kv.delete('vergilius', True)
+        cc.kv.delete('vergilius', True)
 
         shutil.rmtree(vergilius.config.NGINX_CONFIG_PATH)
         shutil.rmtree(vergilius.config.DATA_PATH)

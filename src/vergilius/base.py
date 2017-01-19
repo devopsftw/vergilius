@@ -53,4 +53,3 @@ class ConsulSession(object):
     def get_sid(self):
         yield self._waitSid.wait()
         return self._sid
-

@@ -201,3 +201,9 @@ class AcmeChallengeHandler(tornado.web.RequestHandler):
             self.write(data['Value'])
         else:
             raise tornado.web.HTTPError(404)
+
+
+class DummyCertificateProvider(object):
+    @tornado.gen.coroutine
+    def get_certificate(self, domains):
+        return None

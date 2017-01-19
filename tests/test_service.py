@@ -1,13 +1,15 @@
 
 from base_test import BaseTest
-from vergilius import consul
-from vergilius.models.service import Service
+from vergilius.models import Service
+from consul import Consul
+
+cc = Consul()
 
 
 class Test(BaseTest):
     def setUp(self):
         super(Test, self).setUp()
-        consul.kv.delete('vergilius', True)
+        cc.kv.delete('vergilius', True)
 
     def test_watcher(self):
         pass

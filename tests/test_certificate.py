@@ -1,10 +1,10 @@
 from mock import mock
 
+from consul import Consul
 from base_test import BaseTest
-from vergilius import consul
-from vergilius.models.certificate import Certificate
-from vergilius.models.service import Service
+from vergilius.models import Certificate, Service
 
+cc = Consul()
 
 class Test(BaseTest):
     def __init__(self, methodName='runTest'):
@@ -13,7 +13,7 @@ class Test(BaseTest):
 
     def setUp(self):
         super(Test, self).setUp()
-        consul.kv.delete('vergilius', True)
+        cc.kv.delete('vergilius', True)
 
     def test_keys_request(self):
         cert = Certificate(service=self.service, domains={'example.com'})
