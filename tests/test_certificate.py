@@ -6,10 +6,11 @@ from vergilius.models import Certificate, Service
 
 cc = Consul()
 
+
 class Test(BaseTest):
     def __init__(self, methodName='runTest'):
         super(Test, self).__init__(methodName)
-        self.service = Service('test')
+        self.service = Service('test', app=self.app)
 
     def setUp(self):
         super(Test, self).setUp()

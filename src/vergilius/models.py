@@ -115,8 +115,7 @@ class Service(object):
             if not self.certificate:
                 logger.debug('[service][%s] flush stub config' % self.id)
                 self.flush_nginx_config(self.get_stub_config())
-                self.certificate = Certificate(service=self, domains=self.domains[u'http2'],
-                                               certificate_provider=self.app.certificate_provider)
+                self.certificate = Certificate(service=self, domains=self.domains[u'http2'])
                 logger.debug('[service][%s] wait for cert' % self.id)
                 yield self.certificate.ready_event.wait()
             logger.debug('[service][%s] load real https config' % self.id)
@@ -244,7 +243,7 @@ class Certificate(object):
         self.active = True
         self.lock_session_id = None
 
-        self.certificate_provider = certificate_provider
+        self.certificate_provider = self.service.app.certificate_provider
 
         if not os.path.exists(os.path.join(config.NGINX_CONFIG_PATH, 'certs')):
             os.mkdir(os.path.join(config.NGINX_CONFIG_PATH, 'certs'))
