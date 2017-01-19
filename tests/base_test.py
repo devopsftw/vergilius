@@ -41,7 +41,7 @@ class BaseTest(unittest.TestCase):
     def setUpClass(cls):
         super(BaseTest, cls).setUpClass()
         cls.app = MockApp()
-        cls.watcher = vergilius.loop.ServiceWatcher(app)
+        cls.watcher = vergilius.loop.ServiceWatcher(cls.app)
         cls.watcher.watch_services()
 
         threading.Thread(target=start_tornado).start()

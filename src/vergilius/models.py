@@ -226,7 +226,7 @@ class Certificate(object):
     cc = Consul(host=config.CONSUL_HOST)
     ready_event = Event()
 
-    def __init__(self, service, domains, certificate_provider=None):
+    def __init__(self, service, domains):
         """
         :type domains: set
         :type service: Service - service name got from consul
