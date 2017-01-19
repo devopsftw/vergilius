@@ -10,11 +10,11 @@ cc = Consul()
 class Test(BaseTest):
     def __init__(self, methodName='runTest'):
         super(Test, self).__init__(methodName)
-        self.service = Service('test', app=self.app)
 
     def setUp(self):
         super(Test, self).setUp()
         cc.kv.delete('vergilius', True)
+        self.service = Service('test', app=self.app)
 
     def test_keys_request(self):
         cert = Certificate(service=self.service, domains={'example.com'})

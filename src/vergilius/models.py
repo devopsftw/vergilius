@@ -127,6 +127,7 @@ class Service(object):
     def get_nginx_config(self):
         """
         Generate nginx config from service attributes
+        :rtype: bytes
         """
         return template_loader.load('service.html').generate(service=self, config=config)
 

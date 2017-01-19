@@ -16,12 +16,12 @@ class Test(BaseTest):
 
     def test_base(self):
         service = Service(name='test service', app=self.app)
-        service.flush_nginx_config()
+        service.flush_nginx_config(service.get_nginx_config())
 
         config_file = service.get_nginx_config_path()
         self.assertNotEqual(service.read_nginx_config_file().find('server 127.0.0.1:6666'), -1,
                             'config written and has backup 503')
-        self.assertTrue(service.validate(), 'nginx config is valid')
+        self.assertTrue(service.validate(service.get_nginx_config()), 'nginx config is valid')
         service.delete()
 
         with self.assertRaises(IOError):
@@ -32,21 +32,21 @@ class Test(BaseTest):
 
         service.domains[u'http'] = ('example.com',)
 
-        self.assertNotEqual(service.get_nginx_config().find('server_name example.com *.example.com;'), -1,
+        self.assertNotEqual(service.get_nginx_config().decode().find('server_name example.com *.example.com;'), -1,
                             'server_name and wildcard present')
-        self.assertTrue(service.validate(), 'nginx config is valid')
+        self.assertTrue(service.validate(service.get_nginx_config()), 'nginx config is valid')
 
     def test_http2(self):
         service = Service(name='test service', app=self.app)
         service.domains[u'http2'] = ('example.com',)
-        self.assertTrue(service.validate(), 'nginx config is valid')
+        self.assertTrue(service.validate(service.get_nginx_config()), 'nginx config is valid')
 
     def test_upstream_nodes(self):
         service = Service(name='test service', app=self.app)
         service.domains[u'http'] = ('example.com',)
         service.nodes['test_node'] = {'address': '127.0.0.1', 'port': '10000'}
-        self.assertTrue(service.validate(), 'nginx config is valid')
+        self.assertTrue(service.validate(service.get_nginx_config()), 'nginx config is valid')
 
-        config = service.get_nginx_config()
+        config = service.get_nginx_config().decode()
         self.assertNotEqual(config.find('server 127.0.0.1:10000;'), -1, 'upstream node present')
         self.assertEqual(config.find('server 127.0.0.1:6666'), -1, 'backup node deleted')

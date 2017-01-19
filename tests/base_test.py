@@ -5,12 +5,13 @@ import unittest
 
 import sys
 import shutil
-import tornado
+import tornado.ioloop
 
 os.environ.setdefault('SECRET', 'test')
 import vergilius.base
 import vergilius.cert
 import vergilius.loop
+import vergilius.config
 
 from consul import Consul
 
