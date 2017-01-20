@@ -228,7 +228,7 @@ class DummyCertificateProvider(object):
         ).not_valid_after(
             datetime.datetime.utcnow() + datetime.timedelta(days=10)
         ).add_extension(
-            x509.SubjectAlternativeName([x509.DNSName(domains[0])]),
+            x509.SubjectAlternativeName([x509.DNSName(domain) for domain in domains]),
             critical=False
         ).sign(key, hashes.SHA256(), default_backend())
 
