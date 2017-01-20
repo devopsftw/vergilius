@@ -1,11 +1,11 @@
 import logging
 import os
-import threading
 import unittest
 
 import sys
 import shutil
 import tornado.ioloop
+import tornado.testing
 
 os.environ.setdefault('SECRET', 'test')
 import vergilius.base
@@ -37,23 +37,10 @@ class MockApp(object):
         self.nginx_reloader = vergilius.loop.NginxReloader()
 
 
-class BaseTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super(BaseTest, cls).setUpClass()
-        cls.app = MockApp()
-        cls.watcher = vergilius.loop.ServiceWatcher(cls.app)
-        cls.watcher.watch_services()
-
-        threading.Thread(target=start_tornado).start()
-
-    @classmethod
-    def tearDownClass(cls):
-        super(BaseTest, cls).tearDownClass()
-        tornado.ioloop.IOLoop.instance().stop()
-
+class BaseAsyncTest(tornado.testing.AsyncTestCase):
     def setUp(self):
-        super(BaseTest, self).setUp()
+        super(BaseAsyncTest, self).setUp()
+        self.app = MockApp()
         cc.kv.delete('vergilius', True)
 
         try:
@@ -63,8 +50,9 @@ class BaseTest(unittest.TestCase):
             print(e)
 
     def tearDown(self):
-        super(BaseTest, self).tearDown()
-        cc.kv.delete('vergilius', True)
-
+        super(BaseAsyncTest, self).tearDown()
         shutil.rmtree(vergilius.config.NGINX_CONFIG_PATH)
         shutil.rmtree(vergilius.config.DATA_PATH)
+
+    def get_new_ioloop(self):
+        return tornado.ioloop.IOLoop.instance()

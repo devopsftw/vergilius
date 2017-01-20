@@ -50,14 +50,19 @@ class ServiceWatcher(object):
     def watch_services(self):
         index = None
         while True:
-            try:
-                index, data = yield tc.catalog.services(index, wait=None)
-                self.check_services(data)
-            except ConsulTimeout:
-                pass
-            except ConsulException as e:
-                logger.error('consul error: %s' % e)
-                yield tornado.gen.sleep(5)
+            index = yield self.fetch_services(index)
+
+    @tornado.gen.coroutine
+    def fetch_services(self, index=None):
+        try:
+            index, data = yield tc.catalog.services(index, wait=None)
+            self.check_services(data)
+            return index
+        except ConsulTimeout:
+            pass
+        except ConsulException as e:
+            logger.error('consul error: %s' % e)
+            yield tornado.gen.sleep(1)
 
     def check_services(self, data):
         # check if service has any of our tags
@@ -68,7 +73,7 @@ class ServiceWatcher(object):
                 self.services[service_name] = Service(service_name, self.app)
 
         # cleanup stale services
-        for service_name in self.services.keys():
+        for service_name in list(self.services):
             if service_name not in services_to_publish.keys():
                 logger.info('[service watcher]: removing stale service: %s' % service_name)
                 del self.services[service_name]

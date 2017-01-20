@@ -1,18 +1,30 @@
-
-from base_test import BaseTest
+import tornado.testing
+from base_test import BaseAsyncTest, cc
 from vergilius.models import Service, Certificate
-from consul import Consul
-
-cc = Consul()
+from mock import mock
 
 
-class Test(BaseTest):
+class CertificateTest(BaseAsyncTest):
     def setUp(self):
-        super(Test, self).setUp()
+        super().setUp()
         cc.kv.delete('vergilius', True)
 
-    def test_watcher(self):
-        pass
+    @tornado.testing.gen_test
+    def test_keys_request(self):
+        service = Service('test', app=self.app)
+        cert = Certificate(service, domains={'example.com'})
+        yield cert.ready_event.wait()
+        self.assertTrue(cert.validate(), 'got valid keys')
+
+        with mock.patch.object(Certificate, 'request_certificate', return_value={}) as mock_method:
+            Certificate(service=service, domains={'example.com'})
+            self.assertFalse(mock_method.called, 'check if existing keys are not requested from provider')
+
+
+class ServiceTest(BaseAsyncTest):
+    def setUp(self):
+        super(ServiceTest, self).setUp()
+        cc.kv.delete('vergilius', True)
 
     def test_base(self):
         service = Service(name='test service', app=self.app)

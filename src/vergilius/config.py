@@ -15,6 +15,3 @@ EMAIL = os.environ.get('EMAIL', 'root@localhost')
 SECRET = os.environ.get('SECRET')
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
-
-if not SECRET:
-    raise Exception('No secret specified!')
