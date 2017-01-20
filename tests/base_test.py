@@ -7,7 +7,6 @@ import shutil
 import tornado.ioloop
 import tornado.testing
 
-os.environ.setdefault('SECRET', 'test')
 import vergilius.base
 import vergilius.cert
 import vergilius.loop
@@ -24,10 +23,6 @@ logger.addHandler(out_hdlr)
 logger.setLevel(logging.DEBUG)
 
 cc = Consul()
-
-
-def start_tornado():
-    tornado.ioloop.IOLoop.instance().start()
 
 
 class MockApp(object):

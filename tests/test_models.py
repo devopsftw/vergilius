@@ -48,10 +48,12 @@ class ServiceTest(BaseAsyncTest):
                             'server_name and wildcard present')
         self.assertTrue(service.validate(service.get_nginx_config()), 'nginx config is valid')
 
+    @tornado.testing.gen_test
     def test_http2(self):
         service = Service(name='test service', app=self.app)
         service.domains[u'http2'] = ('example.com',)
-        service.certificate = Certificate(service, service.domains) # FIXME: create tornado-async test and wait for cert
+        service.certificate = Certificate(service, service.domains)
+        yield service.certificate.ready_event.wait()
         self.assertTrue(service.validate(service.get_nginx_config()), 'nginx config is valid')
 
     def test_upstream_nodes(self):
