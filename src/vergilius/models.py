@@ -62,7 +62,7 @@ class Service(object):
         while True and self.active:
             try:
                 index, data = yield tc.health.service(self.name, index, wait=None, passing=True)
-                nodes = sorted([{k:svc[k] for k in svc if k != 'Checks'} for svc in data],
+                nodes = sorted([{k: svc[k] for k in svc if k != 'Checks'} for svc in data],
                                key=lambda x: x['Node']['Node'])
                 if old_nodes != nodes:
                     # okay, got data, now parse and reload
@@ -184,19 +184,21 @@ class Service(object):
                                 )
         nginx_config_file.close()
 
+        result = False
         try:
-            cp = subprocess.run(
+            subprocess.run(
                 [config.NGINX_BINARY, '-t', '-c', nginx_config_file.name],
                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                 check=True
             )
+            result = True
         except subprocess.CalledProcessError as e:
             logger.error('[service][%s] nginx config check failed. stderr: ' % self.id, e.stderr)
         finally:
             os.unlink(service_config_file.name)
             os.unlink('%s.pid' % service_config_file.name)
             os.unlink(nginx_config_file.name)
-        return cp.returncode == 0
+        return result
 
     def delete(self):
         """
@@ -382,7 +384,7 @@ class Certificate(object):
         try:
             serialization.load_pem_private_key(self.private_key, password=None, backend=default_backend())
         except:
-            logger.warning('[certificate][%s]: private key load error: expired' % self.service.id)
+            logger.warning('[certificate][%s]: private key load error: expired' % self.service.id, exc_info=True)
             return False
 
         cert = x509.load_pem_x509_certificate(self.public_key, default_backend())  # type: x509.Certificate
