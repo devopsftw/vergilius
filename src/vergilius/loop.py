@@ -12,6 +12,7 @@ import tornado.gen
 from tornado.locks import Event
 
 logger = logging.getLogger(__name__)
+logger.setLevel(config.LOG_LEVEL)
 tc = TornadoConsul(host=config.CONSUL_HOST)
 
 

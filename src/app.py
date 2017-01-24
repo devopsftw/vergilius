@@ -7,12 +7,13 @@ import tornado.ioloop
 import vergilius.base
 from vergilius.cert import AcmeCertificateProvider
 from vergilius.loop import NginxReloader, ServiceWatcher
+from vergilius import config
 
 MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 10
 
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(name)s %(message)s')
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(config.LOG_LEVEL)
 
 
 def shutdown():

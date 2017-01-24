@@ -22,6 +22,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 logger = logging.getLogger(__name__)
+logger.setLevel(config.LOG_LEVEL)
+
 template_loader = tornado.template.Loader(config.TEMPLATE_PATH)
 tc = TornadoConsul(host=config.CONSUL_HOST)
 cc = Consul(host=config.CONSUL_HOST)

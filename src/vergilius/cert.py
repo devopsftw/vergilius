@@ -21,7 +21,7 @@ from acme import client, messages, jose
 import time
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(config.LOG_LEVEL)
 thread_pool = ThreadPoolExecutor(4)
 tc = TornadoConsul(host=config.CONSUL_HOST)
 

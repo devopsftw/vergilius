@@ -20,3 +20,5 @@ if os.environ.get('ACME_PRODUCTION', 0):
     ACME_DIRECTORY_URL = 'https://acme-v01.api.letsencrypt.org/directory'
 else:
     ACME_DIRECTORY_URL = 'https://acme-staging.api.letsencrypt.org/directory'
+
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'DEBUG')
