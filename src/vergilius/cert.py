@@ -23,12 +23,14 @@ import time
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 thread_pool = ThreadPoolExecutor(4)
+tc = TornadoConsul(host=config.CONSUL_HOST)
 
-DIRECTORY_URL = 'https://acme-staging.api.letsencrypt.org/directory'
+
+def urlsafe_b64(b):
+    return base64.urlsafe_b64encode(b).decode('utf8').replace("=", "")
 
 
 class AcmeCertificateProvider(object):
-    tc = TornadoConsul(host=config.CONSUL_HOST)
     cc = Consul(host=config.CONSUL_HOST)
     _acme = None
     acme_key = None
@@ -39,7 +41,8 @@ class AcmeCertificateProvider(object):
         self.fetch_key()
         self.init_acme()
 
-    def make_app(self):
+    @classmethod
+    def make_app(cls):
         return tornado.web.Application([
             (r"/.well-known/acme-challenge/(.+)", AcmeChallengeHandler),
         ])
@@ -64,7 +67,7 @@ class AcmeCertificateProvider(object):
         self.acme_key = jose.JWKRSA(key=private_key)
 
     def init_acme(self):
-        self._acme = client.Client(DIRECTORY_URL, self.acme_key)
+        self._acme = client.Client(config.ACME_DIRECTORY_URL, self.acme_key)
         try:
             regr = self._acme.register()
             self._acme.agree_to_tos(regr)
@@ -72,48 +75,57 @@ class AcmeCertificateProvider(object):
             logger.error('acme certificate provider error: %s' % e)
             pass
 
-    def get_for_domain(self, domain):
-        def _b64(b):
-            return base64.urlsafe_b64encode(b).decode('utf8').replace("=", "")
+    @classmethod
+    def parse_token(cls, authzr):
+        for c in authzr.body.challenges:
+            json = c.chall.to_partial_json()
+            if json['type'] == 'http-01':
+                return json['token']
 
-        # get token
-        def _parse_token(authzr):
-            for c in authzr.body.challenges:
-                json = c.chall.to_partial_json()
-                if json['type'] == 'http-01':
-                    return json['token']
+    def store_token(self, token):
+        # put token to consul KV
+        thumbprint = urlsafe_b64(self.acme_key.thumbprint())
+        keyauth = '{0}.{1}'.format(token, thumbprint)
+        self.cc.kv.put('vergilius/acme/challenge/%s' % token, keyauth)
 
-        def _store_token(token):
-            # put token to consul KV
-            thumbprint = _b64(self.acme_key.thumbprint())
-            keyauth = '{0}.{1}'.format(token, thumbprint)
-            self.cc.kv.put('vergilius/acme/challenge/%s' % token, keyauth)
+    def delete_token(self, token):
+        self.cc.kv.delete('vergilius/acme/challenge/%s' % token)
 
+    def auth_domain(self, domain):
+        """
+        request and solve ACME challenge for domain
+        :param domain: string
+        :return:
+        :rtype:client.messages.AuthorizationResource
+        """
         # request challenges for domain
         authzr = self._acme.request_domain_challenges(domain)
-        token = _parse_token(authzr)
-        _store_token(token)
+        token = self.parse_token(authzr)
+        self.store_token(token)
 
         challenge = [x for x in authzr.body.challenges if x.typ == 'http-01'][0]
         response, validation = challenge.response_and_validation(self.acme_key)
-        print('chall uri', challenge.uri)
-
-        result = self._acme.answer_challenge(challenge, response)
-        print('answer result is ', result)
+        self._acme.answer_challenge(challenge, response)
 
         wait_until = time.time() + 30
         while time.time() < wait_until:
-            logger.debug('polling...')
+            logger.debug('polling challenge result for %s' % domain)
             authzr, authzr_response = self._acme.poll(authzr)
+            logger.debug('status for %s is %s' % domain, authzr.body.status)
             if authzr.body.status not in (messages.STATUS_VALID, messages.STATUS_INVALID):
                 time.sleep(2)
             else:
                 break
-        logger.debug(authzr)
+        self.delete_token(token)
         return authzr
 
-    def get_csr(self, domains):
-        """create certificate request for domains"""
+    @classmethod
+    def create_csr(cls, domains):
+        """
+        create private key and csr
+        :param domains:
+        :return: tuple with private key and csr in OpenSSL library format
+        """
         private_key = rsa.generate_private_key(
                 public_exponent=65537,
                 key_size=2048,
@@ -143,7 +155,7 @@ class AcmeCertificateProvider(object):
 
     def get_authzrs(self, domains):
         """request challenges for each domain"""
-        authzrs = [self.get_for_domain(domain) for domain in domains]
+        authzrs = [self.auth_domain(domain) for domain in domains]
         return authzrs
 
     def request_certificate(self, csr, authzrs):
@@ -159,8 +171,13 @@ class AcmeCertificateProvider(object):
         return None
 
     def query_letsencrypt(self, domains):
+        """
+        get and solve letsencrypt challenges, create CSR and request certificate for it
+        :param domains:
+        :return:
+        """
         authzrs = self.get_authzrs(domains)
-        domain_key, csr = self.get_csr(domains)
+        domain_key, csr = self.create_csr(domains)
         cert = self.request_certificate(csr, authzrs)
         return domain_key, cert
 
@@ -192,12 +209,10 @@ class AcmeCertificateProvider(object):
 
 
 class AcmeChallengeHandler(tornado.web.RequestHandler):
-    tc = TornadoConsul(host=config.CONSUL_HOST)
-
     @tornado.gen.coroutine
     def get(self, challenge):
         logger.debug('challenge request: %s' % challenge)
-        index, data = yield self.tc.kv.get('vergilius/acme/challenge/%s' % challenge)
+        index, data = yield tc.kv.get('vergilius/acme/challenge/%s' % challenge)
         if data:
             self.write(data['Value'])
         else:
