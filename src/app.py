@@ -35,7 +35,7 @@ def shutdown():
     stop_loop()
 
 
-def sig_handler(sig):
+def sig_handler(sig, _):
     logger.warning('Caught signal: %s', sig)
     tornado.ioloop.IOLoop.instance().add_callback(shutdown)
 
