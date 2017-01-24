@@ -56,16 +56,17 @@ class Service(object):
 
     @tornado.gen.coroutine
     def watch(self):
-        index = None
-        old_data = None
+        index = old_nodes = None
         while True and self.active:
             try:
                 index, data = yield tc.health.service(self.name, index, wait=None, passing=True)
-                if old_data != data:
+                nodes = sorted([{k:svc[k] for k in svc if k != 'Checks'} for svc in data],
+                               key=lambda x: x['Node']['Node'])
+                if old_nodes != nodes:
+                    # okay, got data, now parse and reload
                     yield self.parse_data(data)
-                    # okay, got data, now reload
                     yield self.update_config()
-                    old_data = data
+                    old_nodes = nodes
             except ConsulTimeout:
                 pass
             except ConsulException as e:
