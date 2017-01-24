@@ -183,19 +183,18 @@ class Service(object):
         nginx_config_file.close()
 
         try:
-            return_code = subprocess.check_call(
+            cp = subprocess.run(
                 [config.NGINX_BINARY, '-t', '-c', nginx_config_file.name],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                check=True
             )
-        except subprocess.CalledProcessError:
-            return_code = 1
+        except subprocess.CalledProcessError as e:
+            logger.error('[service][%s] nginx config check failed. stderr: ' % self.id, e.stderr)
         finally:
             os.unlink(service_config_file.name)
             os.unlink('%s.pid' % service_config_file.name)
             os.unlink(nginx_config_file.name)
-
-        return return_code == 0
+        return cp.returncode == 0
 
     def delete(self):
         """
