@@ -4,8 +4,12 @@ import subprocess
 import tempfile
 import unicodedata
 
+import itertools
 from consul import tornado, base, ConsulException
+from shutil import rmtree
+
 from vergilius import config, consul_tornado, consul, logger, template_loader
+from vergilius.components import port_allocator
 from vergilius.loop.nginx_reloader import NginxReloader
 from vergilius.models.certificate import Certificate
 
@@ -20,9 +24,12 @@ class Service(object):
         logger.info('[service][%s]: new and loading' % self.name)
         self.allow_crossdomain = False
         self.nodes = {}
-        self.domains = {
+        self.port = None
+        self.binds = {
             u'http': set(),
-            u'http2': set()
+            u'http2': set(),
+            u'tcp': set(),
+            u'udp': set()
         }
 
         self.active = True
@@ -35,7 +42,7 @@ class Service(object):
         self.watch()
 
     def fetch(self):
-        index, data = consul.health.service(self.name, passing=True)
+        index, data = consul.health.service(self.id, passing=True)
         self.parse_data(data)
 
     @tornado.gen.coroutine
@@ -43,7 +50,7 @@ class Service(object):
         index = None
         while True and self.active:
             try:
-                index, data = yield consul_tornado.health.service(self.name, index, wait=None, passing=True)
+                index, data = yield consul_tornado.health.service(self.id, index, wait=None, passing=True)
                 self.parse_data(data)
             except ConsulException as e:
                 logger.error('consul exception: %s' % e)
@@ -55,18 +62,18 @@ class Service(object):
 
         :type data: set[]
         """
-        for protocol in self.domains.iterkeys():
-            self.domains[protocol].clear()
+        for protocol in self.binds.iterkeys():
+            self.binds[protocol].clear()
 
         allow_crossdomain = False
         self.nodes = {}
         for node in data:
             if not node[u'Service'][u'Port']:
-                logger.warn('[service][%s]: Node %s is ignored due no ServicePort' % (self.id, node[u'Node']))
+                logger.warn('[service][%s]: Node %s is ignored due no Service Port' % (self.id, node[u'Node'][u'Node']))
                 continue
 
             if node[u'Service'][u'Tags'] is None:
-                logger.warn('[service][%s]: Node %s is ignored due no ServiceTags' % (self.id, node[u'Node']))
+                logger.warn('[service][%s]: Node %s is ignored due no Service Tags' % (self.id, node[u'Node'][u'Node']))
                 continue
 
             self.nodes[node['Node']['Node']] = {
@@ -80,66 +87,89 @@ class Service(object):
 
             for protocol in [u'http', u'http2']:
                 if protocol in node[u'Service'][u'Tags']:
-                    self.domains[protocol].update(
+                    self.binds[protocol].update(
                             tag.replace(protocol + ':', '') for tag in node[u'Service'][u'Tags'] if
                             tag.startswith(protocol + ':')
                     )
+
+            for protocol in ['tcp', 'udp']:
+                self.binds[protocol].update({node[u'Service'][u'Port']})
 
         self.allow_crossdomain = allow_crossdomain
 
         self.flush_nginx_config()
 
-    def get_nginx_config(self):
+    def get_nginx_config(self, config_type):
         """
         Generate nginx config from service attributes
+        :param config_type: string
         """
-        if self.domains[u'http2']:
+        if config_type == 'http2' and len(self.binds['http2']):
             self.check_certificate()
-        return template_loader.load('service.html').generate(service=self, config=config)
+
+        if config_type in ['tcp', 'udp']:
+            self.check_port()
+
+        return template_loader.load('service_%s.html' % config_type).generate(service=self, config=config)
 
     def flush_nginx_config(self):
         if not self.validate():
             logger.error('[service][%s]: failed to validate nginx config!' % self.id)
             return False
 
-        nginx_config = self.get_nginx_config()
-        deployed_nginx_config = None
+        has_changes = False
 
-        try:
-            deployed_nginx_config = self.read_nginx_config_file()
-        except IOError:
-            pass
+        for config_type in self.get_config_types():
+            nginx_config = self.get_nginx_config(config_type)
+            deployed_nginx_config = None
 
-        if deployed_nginx_config != nginx_config:
-            config_file = open(self.get_nginx_config_path(), 'w+')
-            config_file.write(nginx_config)
-            config_file.close()
-            logger.info('[service][%s]: got new nginx config %s' % (self.name, self.get_nginx_config_path()))
+            try:
+                deployed_nginx_config = self.read_nginx_config_file(config_type)
+            except IOError:
+                pass
+
+            if deployed_nginx_config != nginx_config:
+                config_file = open(self.get_nginx_config_path(config_type), 'w+')
+                config_file.write(nginx_config)
+                config_file.close()
+                has_changes = True
+
+        if has_changes:
             NginxReloader.queue_reload()
+            logger.info('[service][%s]: got new nginx config' % self.name)
 
-    def get_nginx_config_path(self):
-        return os.path.join(config.NGINX_CONFIG_PATH, self.id + '.conf')
+    def get_nginx_config_path(self, config_type):
+        return os.path.join(config.NGINX_CONFIG_PATH, '%s.%s.conf' % (self.id, config_type))
 
-    def read_nginx_config_file(self):
-        with open(self.get_nginx_config_path(), 'r') as config_file:
+    def read_nginx_config_file(self, config_type):
+        with open(self.get_nginx_config_path(config_type), 'r') as config_file:
             config_content = config_file.read()
             config_file.close()
             return config_content
+
+    def get_config_types(self):
+        return itertools.chain(self.binds.keys(), ['upstream'])
 
     def validate(self):
         """
         Deploy temporary service & nginx config and validate it with nginx
         :return: bool
         """
-        service_config_file = tempfile.NamedTemporaryFile(delete=False)
-        service_config_file.write(self.get_nginx_config())
-        service_config_file.close()
 
-        nginx_config_file = tempfile.NamedTemporaryFile(delete=False)
-        nginx_config_file.write(template_loader.load('service_validate.html')
-                                .generate(service_config=service_config_file.name,
-                                          pid_file='%s.pid' % service_config_file.name)
-                                )
+        temp_dir = tempfile.mkdtemp()
+
+        files = {}
+        for config_type in self.get_config_types():
+            path = os.path.join(temp_dir, config_type)
+            config_file = open(path, 'w+')
+            config_file.write(self.get_nginx_config(config_type))
+            config_file.close()
+            files['service_%s' % config_type] = path
+
+        files['pid_file'] = os.path.join(temp_dir, 'pid')
+
+        nginx_config_file = open(os.path.join(temp_dir, 'service'), 'w+')
+        nginx_config_file.write(template_loader.load('service_validate.html').generate(**files))
         nginx_config_file.close()
 
         try:
@@ -147,9 +177,7 @@ class Service(object):
         except subprocess.CalledProcessError:
             return_code = 1
         finally:
-            os.unlink(service_config_file.name)
-            os.unlink('%s.pid' % service_config_file.name)
-            os.unlink(nginx_config_file.name)
+            rmtree(temp_dir, ignore_errors=True)
 
         return return_code == 0
 
@@ -161,10 +189,14 @@ class Service(object):
         logger.info('[service][%s]: deleting' % self.name)
         self.active = False
 
-        try:
-            os.remove(self.get_nginx_config_path())
-        except OSError:
-            pass
+        if self.port:
+            self.release_port()
+
+        for config_type in self.get_config_types():
+            try:
+                os.remove(self.get_nginx_config_path(config_type))
+            except OSError:
+                pass
 
     def __del__(self):
         if self.active:
@@ -182,4 +214,14 @@ class Service(object):
 
     def check_certificate(self):
         if not self.certificate:
-            self.certificate = Certificate(service=self, domains=self.domains[u'http2'])
+            self.certificate = Certificate(service=self, domains=self.binds['http2'])
+
+    def check_port(self):
+        if not self.port:
+            self.port = port_allocator.allocate()
+            consul.kv.put('vergilius/ports/%s' % self.name, str(self.port))
+
+    def release_port(self):
+        if self.port:
+            port_allocator.release(self.port)
+            consul.kv.delete('vergilius/ports/%s' % self.name)

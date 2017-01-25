@@ -20,9 +20,14 @@ test:
   pre:
     - docker run -d -p 8500:8500 e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc circle -domain local
     - curl --retry 10 --retry-delay 5 -v http://localhost:8500
+    - sed -i '1i load_module "modules/ngx_stream_module.so";' /home/ubuntu/vergilius/src/vergilius/templates/service_validate.html
 
 deployment:
-  dockerhub:
+  dockerhub_master:
     branch: master
     commands:
       - 'curl -H "Content-Type: application/json" --data "{\"source_type\": \"Branch\", \"source_name\": \"master\"}" -X POST https://registry.hub.docker.com/u/devopsftw/vergilius/trigger/ea3f932c-49b9-47e8-af0c-ec1d8615cda4/'
+  dockerhub_tag:
+    tag: /.*/
+    commands:
+      - 'curl -H "Content-Type: application/json" --data "{\"source_type\": \"Tag\", \"source_name\": \"$CIRCLE_TAG\"}" -X POST https://registry.hub.docker.com/u/devopsftw/vergilius/trigger/ea3f932c-49b9-47e8-af0c-ec1d8615cda4/'

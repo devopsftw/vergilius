@@ -1,0 +1,7 @@
+{% whitespace all%}
+{% if len(service.binds['udp']) %}
+server {
+    listen {{service.port}} udp;
+    proxy_pass {{service.id}};
+}
+{% end %}
