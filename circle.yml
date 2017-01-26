@@ -20,7 +20,6 @@ test:
   pre:
     - docker run -d -p 8500:8500 e96tech/consul-server -advertise 127.0.0.1 -bootstrap -dc circle -domain local
     - curl --retry 10 --retry-delay 5 -v http://localhost:8500
-    - sed -i '1i load_module "modules/ngx_stream_module.so";' /home/ubuntu/vergilius/src/vergilius/templates/service_validate.html
 
 deployment:
   dockerhub_master:
