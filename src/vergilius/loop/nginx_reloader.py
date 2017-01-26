@@ -4,6 +4,12 @@ from tornado.locks import Event
 
 import vergilius
 
+try:
+    from subprocess import DEVNULL  # py3k
+except ImportError:
+    import os
+    DEVNULL = open(os.devnull, 'wb')
+
 
 class NginxReloader(object):
     nginx_update_event = Event()
@@ -18,7 +24,7 @@ class NginxReloader(object):
             yield cls.nginx_update_event.wait()
             cls.nginx_update_event.clear()
             vergilius.logger.info('[nginx]: reload')
-            subprocess.check_call([vergilius.config.NGINX_BINARY, '-s', 'reload'], stdout=subprocess.DEVNULL)
+            subprocess.check_call([vergilius.config.NGINX_BINARY, '-s', 'reload'], stdout=DEVNULL)
 
     @classmethod
     def queue_reload(cls):
