@@ -321,26 +321,28 @@ class Certificate(object):
     def get_cert_path(self):
         return os.path.join(config.NGINX_CONFIG_PATH, 'certs', self.service.id + '.pem')
 
+    @tornado.gen.coroutine
     def acquire_lock(self):
         """
         Create a lock in consul to prevent certificate request race condition
         """
-        self.lock_session_id = cc.session.create(behavior='delete', ttl=10)
-        return cc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
+        self.lock_session_id = yield self.service.app.session.get_sid()
+        result = yield tc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
+        return result
 
+    @tornado.gen.coroutine
     def unlock(self):
         if not self.lock_session_id:
             return
 
-        cc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
-        cc.session.destroy(self.lock_session_id)
+        yield tc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
         self.lock_session_id = None
 
     @tornado.gen.coroutine
     def request_certificate(self):
         logger.debug('[certificate][%s] Requesting new keys for %s ' % (self.service.name, self.domains))
 
-        if not self.acquire_lock():
+        if not (yield self.acquire_lock()):
             logger.debug('[certificate][%s] failed to acquire lock for keys generation' % self.service.name)
             return False
 
@@ -368,7 +370,7 @@ class Certificate(object):
             logger.error(e)
             raise e
         finally:
-            self.unlock()
+            yield self.unlock()
 
     def serialize_domains(self):
         return '|'.join(sorted(self.domains)).encode()

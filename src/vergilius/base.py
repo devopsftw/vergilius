@@ -14,9 +14,8 @@ tc = TornadoConsul(host=config.CONSUL_HOST)
 
 
 class ConsulSession(object):
-    _sid = None
-
     def __init__(self):
+        self._sid = None
         self._waitSid = Event()
         IOLoop.instance().spawn_callback(self.watch)
         pass
@@ -37,8 +36,10 @@ class ConsulSession(object):
             try:
                 yield tc.session.renew(self._sid)
             except consul.NotFound:
+                self._waitSid.clear()
                 logger.error('session not found, trying to recreate')
                 self._sid = yield self.create_session()
+                self._waitSid.set()
             except consul.ConsulException as e:
                 logger.error('consul exception: %s' % e)
         return True
