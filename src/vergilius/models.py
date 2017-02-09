@@ -30,8 +30,6 @@ cc = Consul(host=config.CONSUL_HOST)
 
 
 class Service(object):
-    active = False
-
     def __init__(self, name, app):
         """
         :type name: unicode - service name got from consul
@@ -230,15 +228,12 @@ class Service(object):
 
 
 class Certificate(object):
-    tc = TornadoConsul(host=config.CONSUL_HOST)
-    cc = Consul(host=config.CONSUL_HOST)
-    ready_event = Event()
-
     def __init__(self, service, domains):
         """
         :type domains: set
         :type service: Service - service name got from consul
         """
+        self.ready_event = Event()
         self.expires = 0
         self.service = service
         self.domains = sorted(domains)
