@@ -68,5 +68,9 @@ server {
         return 301 https://$server_name$request_uri;
     }
     {% end %}
+
+    location /.well-known/ {
+        proxy_pass http://127.0.0.1:8888;
+    }
 }
 {% end %}
