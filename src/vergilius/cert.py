@@ -73,7 +73,6 @@ class AcmeCertificateProvider(object):
             self._acme.agree_to_tos(regr)
         except Exception as e:
             logger.error('acme certificate provider error: %s' % e)
-            pass
 
     @classmethod
     def parse_token(cls, authzr):

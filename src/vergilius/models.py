@@ -234,6 +234,7 @@ class Certificate(object):
         :type service: Service - service name got from consul
         """
         self.ready_event = Event()
+        self.is_valid = False
         self.expires = 0
         self.service = service
         self.domains = sorted(domains)
@@ -280,15 +281,18 @@ class Certificate(object):
                 if hasattr(self, key):
                     setattr(self, key, item['Value'])
 
-            if not self.validate():
+            if self.validate():
+                self.is_valid = True
+                logger.debug('[certificate][%s]: using existing keys' % self.service.id)
+            else:
                 logger.warning('[certificate][%s]: cant validate existing keys' % self.service.id)
                 self.discard_certificate()
                 if not (yield self.request_certificate()):
+                    self.ready_event.set()
                     return False
-            else:
-                logger.debug('[certificate][%s]: using existing keys' % self.service.id)
         else:
             if not (yield self.request_certificate()):
+                self.ready_event.set()
                 return False
 
         self.write_certificate_files()
@@ -322,7 +326,7 @@ class Certificate(object):
         Create a lock in consul to prevent certificate request race condition
         """
         self.lock_session_id = yield self.service.app.session.get_sid()
-        result = yield tc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', acquire=self.lock_session_id)
+        result = yield tc.kv.put('vergilius/locks/cert/%s' % self.service.id, '', acquire=self.lock_session_id)
         return result
 
     @tornado.gen.coroutine
@@ -330,7 +334,7 @@ class Certificate(object):
         if not self.lock_session_id:
             return
 
-        yield tc.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
+        yield tc.kv.put('vergilius/locks/cert/%s' % self.service.id, '', release=self.lock_session_id)
         self.lock_session_id = None
 
     @tornado.gen.coroutine
@@ -361,9 +365,10 @@ class Certificate(object):
             cc.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
             logger.info('[certificate][%s]: got new keys for %s ' % (self.service.name, self.domains))
             self.write_certificate_files()
+            self.is_valid = True
         except Exception as e:
-            logger.error(e)
-            raise e
+            logger.error('[certificate][%s]: certificate request error, discarding: %s' % (self.service.id, e))
+            self.is_valid = False
         finally:
             yield self.unlock()
 

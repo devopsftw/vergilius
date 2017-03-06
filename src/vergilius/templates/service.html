@@ -6,7 +6,7 @@ upstream {{service.id}} {
     {% if not service.nodes %}server 127.0.0.1:6666;{% end %}
 }
 
-{% if len(service.domains['http2']) and service.certificate.private_key and service.certificate.public_key %}
+{% if len(service.domains['http2']) and service.certificate.is_valid %}
 server {
     server_name{% for domain in service.domains['http2'] %} {{ domain }} *.{{ domain }}{% end %};
     listen {{config.NGINX_HTTP2_PORT}} ssl http2;
