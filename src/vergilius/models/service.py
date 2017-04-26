@@ -69,11 +69,13 @@ class Service(object):
         self.nodes = {}
         for node in data:
             if not node[u'Service'][u'Port']:
-                logger.warn('[service][%s]: Node %s is ignored due no Service Port' % (self.id, node[u'Node'][u'Node']))
+                logger.warn('[service][%s]: Node %s is ignored due no Service Port' % (
+                    self.id, node[u'Node'][u'Node']))
                 continue
 
             if node[u'Service'][u'Tags'] is None:
-                logger.warn('[service][%s]: Node %s is ignored due no Service Tags' % (self.id, node[u'Node'][u'Node']))
+                logger.warn('[service][%s]: Node %s is ignored due no Service Tags' % (
+                    self.id, node[u'Node'][u'Node']))
                 continue
 
             self.nodes[node['Node']['Node']] = {
@@ -88,8 +90,8 @@ class Service(object):
             for protocol in [u'http', u'http2']:
                 if protocol in node[u'Service'][u'Tags']:
                     self.binds[protocol].update(
-                            tag.replace(protocol + ':', '') for tag in node[u'Service'][u'Tags'] if
-                            tag.startswith(protocol + ':')
+                        tag.replace(protocol + ':', '') for tag in node[u'Service'][u'Tags'] if
+                        tag.startswith(protocol + ':')
                     )
 
             for protocol in ['tcp', 'udp']:
@@ -188,9 +190,7 @@ class Service(object):
 
         logger.info('[service][%s]: deleting' % self.name)
         self.active = False
-
-        if self.port:
-            self.release_port()
+        self.release_port()
 
         for config_type in self.get_config_types():
             try:
@@ -217,11 +217,7 @@ class Service(object):
             self.certificate = Certificate(service=self, domains=self.binds['http2'])
 
     def check_port(self):
-        if not self.port:
-            self.port = port_allocator.allocate()
-            consul.kv.put('vergilius/ports/%s' % self.name, str(self.port))
+        self.port = port_allocator.allocate(self)
 
     def release_port(self):
-        if self.port:
-            port_allocator.release(self.port)
-            consul.kv.delete('vergilius/ports/%s' % self.name)
+        port_allocator.release(self)
