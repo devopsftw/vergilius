@@ -66,7 +66,7 @@ class BaseTest(unittest.TestCase):
     def tearDown(self):
         super(BaseTest, self).tearDown()
         consul.kv.delete('vergilius', True)
-        port_allocator.allocated = set()
+        port_allocator.allocated = {}
 
         try:
             shutil.rmtree(vergilius.config.NGINX_CONFIG_PATH)
