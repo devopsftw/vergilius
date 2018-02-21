@@ -1,8 +1,6 @@
 from mock import mock
 
 from base_test import BaseTest
-from vergilius import consul
-from vergilius.components import port_allocator
 from vergilius.models.service import Service
 
 
@@ -71,17 +69,3 @@ class Test(BaseTest):
         self.assertTrue(service.validate(), 'nginx config is valid')
         config = service.get_nginx_config('udp')
         self.assertNotEqual(config.find('listen %s udp;' % service.port), -1, 'udp listen valid')
-
-    def test_port_allocate(self):
-        service = Service(name='test service')
-
-        service.check_port()
-        self.assertEqual(service.port, 7000)
-        consul_port_data = consul.kv.get('vergilius/ports/test service')
-        self.assertIsNotNone(consul_port_data)
-        self.assertEqual('7000', consul_port_data[1][u'Value'])
-
-        service.delete()
-        self.assertFalse(7000 in port_allocator.allocated)
-        consul_port_data = consul.kv.get('vergilius/ports/test service')
-        self.assertIsNotNone(consul_port_data)

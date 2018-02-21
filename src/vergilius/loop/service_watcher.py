@@ -1,6 +1,7 @@
 import vergilius
 
 from consul import tornado, base
+from vergilius.components import port_allocator
 from vergilius.models.service import Service
 
 
