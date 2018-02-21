@@ -57,14 +57,12 @@ class Certificate(object):
 
             if not self.validate():
                 logger.warn('[certificate][%s]: cant validate existing keys' % self.service.id)
-                self.discard_certificate()
-                if not self.request_certificate():
-                    return False
+                return False
             else:
                 logger.debug('[certificate][%s]: using existing keys' % self.service.id)
         else:
-            if not self.request_certificate():
-                return False
+            logger.warn('[certificate][%s]: cant find certificate in consul' % self.service.id)
+            return False
 
         self.write_certificate_files()
         return True
@@ -104,38 +102,6 @@ class Certificate(object):
         consul.kv.put('vergilius/certificates/%s/lock' % self.service.id, '', release=self.lock_session_id)
         consul.session.destroy(self.lock_session_id)
         self.lock_session_id = None
-
-    def request_certificate(self):
-        logger.debug('[certificate][%s] Requesting new keys for %s ' % (self.service.name, self.domains))
-
-        if not self.lock():
-            logger.debug('[certificate][%s] failed to acquire lock for keys generation' % self.service.name)
-            return False
-
-        try:
-            data = certificate_provider.get_certificate(self.service.id, self.domains)
-
-            with open(data['private_key'], 'r') as f:
-                self.private_key = f.read()
-                f.close()
-                consul.kv.put('vergilius/certificates/%s/private_key' % self.service.id, self.private_key)
-
-            with open(data['public_key'], 'r') as f:
-                self.public_key = f.read()
-                f.close()
-                consul.kv.put('vergilius/certificates/%s/public_key' % self.service.id, self.public_key)
-
-            self.expires = data['expires']
-            self.key_domains = self.serialize_domains()
-            consul.kv.put('vergilius/certificates/%s/expires' % self.service.id, str(self.expires))
-            consul.kv.put('vergilius/certificates/%s/key_domains' % self.service.id, self.serialize_domains())
-            logger.info('[certificate][%s]: got new keys for %s ' % (self.service.name, self.domains))
-            self.write_certificate_files()
-        except Exception as e:
-            logger.error(e)
-            raise e
-        finally:
-            self.unlock()
 
     def serialize_domains(self):
         return '|'.join(sorted(self.domains))
