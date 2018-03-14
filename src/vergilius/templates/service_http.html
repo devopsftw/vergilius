@@ -4,6 +4,8 @@ server {
     server_name{% for domain in service.binds['http'] %} {{ domain }} *.{{ domain }}{% end %};
     listen {{config.NGINX_HTTP_PORT}};
 
+    include /etc/nginx/robots.inc;
+
     {% if len(service.binds['http']) %}
     location / {
         proxy_pass http://{{service.id}};
@@ -12,6 +14,8 @@ server {
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        proxy_cache off;
 
         {% if service.allow_crossdomain %}
         proxy_hide_header 'Access-Control-Allow-Origin';

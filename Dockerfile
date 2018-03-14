@@ -15,6 +15,7 @@ ADD services/vergilius.sh /etc/service/vergilius/run
 COPY consul/* /etc/consul/conf.d/
 COPY nginx/conf.d/*.conf /etc/nginx/conf.d/
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/robots.inc /etc/nginx/robots.inc
 RUN rm /etc/nginx/sites-enabled/* && mkdir -p /etc/nginx/sites-enabled/certs && \
     mkdir -p /data/dummy_ca/domains/
 
