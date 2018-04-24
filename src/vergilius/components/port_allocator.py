@@ -65,5 +65,8 @@ def collect_garbage(services):
 
 def release(service):
     if allocated.get(service.id):
-        del allocated[service.id]
-        consul.kv.delete(consul_port_key(service))
+        try:
+            del allocated[service.id]
+            consul.kv.delete(consul_port_key(service))
+        except Exception:
+            logger.error('[service][%s]: deleting service port from consul is failed' % service.id)
