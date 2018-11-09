@@ -6,7 +6,6 @@ RUN apt-get update
 #apt-get upgrade -y -o Dpkg::Options::="--force-confold" && \
 RUN apt-get install -y ca-certificates nginx git-core python build-essential autoconf libtool \
     python-dev libffi-dev libssl-dev python-pip dialog nano
-ENV TERM screen
 
 ADD init.d/01_env.sh /etc/init.d/
 ADD services/nginx.sh /etc/service/nginx/run
